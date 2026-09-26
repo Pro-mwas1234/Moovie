@@ -1,0 +1,13 @@
+.gradle/
+.tools/
+build/
+app/build/
+local.properties
+*.iml
+.idea/
+.DS_Store
+captures/
+.externalNativeBuild/
+.cxx/
+# Firebase config holds project identifiers; commit intentionally if you want it shared
+app/google-services.json

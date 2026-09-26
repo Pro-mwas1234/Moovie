@@ -1,0 +1,73 @@
+name: Release
+
+# Builds a release APK and publishes it to a GitHub Release whenever a tag
+# like v1.2.3 is pushed. The in-app updater reads that same release feed, so
+# shipping an update is: bump versionCode/versionName, commit, tag, push.
+#
+# APK signing: add repo secrets MOOVIE_KEYSTORE_B64 / MOOVIE_STORE_PASSWORD /
+# MOOVIE_KEY_ALIAS / MOOVIE_KEY_PASSWORD to sign with your own key. Without
+# them it falls back to the debug key (still installable, just not
+# upgrade-compatible with a properly signed build).
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Write local.properties from secrets (optional)
+        env:
+          TMDB_KEY: ${{ secrets.TMDB_API_KEY }}
+        run: |
+          if [ -n "$TMDB_KEY" ]; then
+            echo "tmdb.api.key=$TMDB_KEY" > local.properties
+          fi
+
+      - name: Build release APK
+        run: gradle :app:assembleRelease
+
+      - name: Decode signing keystore
+        if: env.MOOVIE_KEYSTORE_B64 != ''
+        env:
+          MOOVIE_KEYSTORE_B64: ${{ secrets.MOOVIE_KEYSTORE_B64 }}
+        run: |
+          echo "$MOOVIE_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/moovie.keystore"
+          echo "MOOVIE_STORE_FILE=$RUNNER_TEMP/moovie.keystore" >> "$GITHUB_ENV"
+
+      - name: Rename APK
+        id: apk
+        run: |
+          SRC=$(ls app/build/outputs/apk/*/app-*.apk | head -1)
+          NAME="Moovie-${GITHUB_REF_NAME:-manual}.apk"
+          cp "$SRC" "$NAME"
+          echo "path=$NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release and upload APK
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Moovie-*.apk
+          generate_release_notes: true
+          fail_on_unmatched_files: true
