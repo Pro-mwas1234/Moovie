@@ -1,6 +1,7 @@
 .gradle/
 .tools/
 build/
+node-movie/
 app/build/
 local.properties
 *.iml
