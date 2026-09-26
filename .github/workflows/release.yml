@@ -13,7 +13,11 @@ on:
   push:
     tags:
       - "v*"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release as (e.g. v1.2.3)"
+        required: true
 
 permissions:
   contents: write
@@ -46,29 +50,36 @@ jobs:
             echo "tmdb.api.key=$TMDB_KEY" > local.properties
           fi
 
-      - name: Decode signing keystore
+      - name: Prepare signing variables (always exported)
         env:
           MOOVIE_KEYSTORE_B64: ${{ secrets.MOOVIE_KEYSTORE_B64 }}
           MOOVIE_STORE_PASSWORD: ${{ secrets.MOOVIE_STORE_PASSWORD }}
           MOOVIE_KEY_ALIAS: ${{ secrets.MOOVIE_KEY_ALIAS }}
           MOOVIE_KEY_PASSWORD: ${{ secrets.MOOVIE_KEY_PASSWORD }}
         run: |
+          # If a keystore secret is provided, decode it and export the file path.
           if [[ -n "$MOOVIE_KEYSTORE_B64" ]]; then
             echo "$MOOVIE_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/moovie.keystore"
             echo "MOOVIE_STORE_FILE=$RUNNER_TEMP/moovie.keystore" >> "$GITHUB_ENV"
             echo "MOOVIE_STORE_PASSWORD=$MOOVIE_STORE_PASSWORD" >> "$GITHUB_ENV"
             echo "MOOVIE_KEY_ALIAS=$MOOVIE_KEY_ALIAS" >> "$GITHUB_ENV"
             echo "MOOVIE_KEY_PASSWORD=$MOOVIE_KEY_PASSWORD" >> "$GITHUB_ENV"
+          else
+            # No signing secrets – explicitly unset the vars so Gradle falls back to debug.
+            echo "MOOVIE_STORE_FILE=" >> "$GITHUB_ENV"
+            echo "MOOVIE_STORE_PASSWORD=" >> "$GITHUB_ENV"
+            echo "MOOVIE_KEY_ALIAS=" >> "$GITHUB_ENV"
+            echo "MOOVIE_KEY_PASSWORD=" >> "$GITHUB_ENV"
           fi
 
       - name: Build release APK
-        run: gradle :app:assembleRelease
+        run: ./gradlew :app:assembleRelease
 
       - name: Rename APK
         id: apk
         run: |
           SRC=$(ls app/build/outputs/apk/*/app-*.apk | head -1)
-          NAME="Moovie-${GITHUB_REF_NAME:-manual}.apk"
+          NAME="Moovie-${{ inputs.tag || github.ref_name }}.apk"
           cp "$SRC" "$NAME"
           echo "path=$NAME" >> "$GITHUB_OUTPUT"
 
@@ -76,6 +87,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: Moovie-*.apk
-          tag_name: ${{ github.ref_name }}
+          tag_name: ${{ inputs.tag || github.ref_name }}
           generate_release_notes: true
           fail_on_unmatched_files: true
