@@ -38,6 +38,8 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           api-level: 35
+          # Explicitly specify components to avoid trying to install 'tools'
+          components: platforms;android-35,platform-tools
 
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
