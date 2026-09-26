@@ -46,16 +46,19 @@ jobs:
             echo "tmdb.api.key=$TMDB_KEY" > local.properties
           fi
 
-      - name: Build release APK
-        run: gradle :app:assembleRelease
-
       - name: Decode signing keystore
-        if: env.MOOVIE_KEYSTORE_B64 != ''
+        if: ${{ secrets.MOOVIE_KEYSTORE_B64 != '' }}
         env:
           MOOVIE_KEYSTORE_B64: ${{ secrets.MOOVIE_KEYSTORE_B64 }}
         run: |
           echo "$MOOVIE_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/moovie.keystore"
           echo "MOOVIE_STORE_FILE=$RUNNER_TEMP/moovie.keystore" >> "$GITHUB_ENV"
+          echo "MOOVIE_STORE_PASSWORD=${{ secrets.MOOVIE_STORE_PASSWORD }}" >> "$GITHUB_ENV"
+          echo "MOOVIE_KEY_ALIAS=${{ secrets.MOOVIE_KEY_ALIAS }}" >> "$GITHUB_ENV"
+          echo "MOOVIE_KEY_PASSWORD=${{ secrets.MOOVIE_KEY_PASSWORD }}" >> "$GITHUB_ENV"
+
+      - name: Build release APK
+        run: gradle :app:assembleRelease
 
       - name: Rename APK
         id: apk
@@ -69,5 +72,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: Moovie-*.apk
+          tag_name: ${{ github.ref_name }}
           generate_release_notes: true
           fail_on_unmatched_files: true
