@@ -2,6 +2,7 @@
 .tools/
 build/
 node-movie/
+node-movie/test-dl/
 app/build/
 local.properties
 *.iml
