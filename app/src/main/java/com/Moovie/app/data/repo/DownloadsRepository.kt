@@ -17,11 +17,9 @@ class DownloadsRepository {
     fun downloads(uid: String): StateFlow<List<DownloadItem>> = local.downloadFlow(uid)
 
     suspend fun addOrUpdate(uid: String, item: DownloadItem) {
-        local.downloadFlow(uid).value = {
-            val current = it.toMutableList()
-            current.removeAll { it.key == item.key }
-            listOf(item) + current
-        }(local.downloadFlow(uid).value)
+        val current = local.downloadFlow(uid).value.toMutableList()
+        current.removeAll { it.key == item.key }
+        local.downloadFlow(uid).value = listOf(item) + current
     }
 
     suspend fun setStatus(uid: String, docId: String, status: String) {

@@ -100,21 +100,20 @@ class DownloadViewModel(
     fun startDownload(item: DownloadItem, quality: StreamQuality, onStarted: () -> Unit) {
         if (quality.vipLocked || quality.url.isBlank()) return
         viewModelScope.launch {
-            val uid = ServiceLocator.auth.ensureUid()
-            if (uid == null) {
-                error.value = "Couldn't sign in (guest auth failed). Check your connection and try again."
-                return@launch
+            try {
+                val uid = ServiceLocator.auth.ensureUid()
+                if (uid == null) {
+                    error.value = "Couldn't sign in (guest auth failed). Check your connection and try again."
+                    return@launch
+                }
+                // Persist first so DownloadManager's update() finds the row.
+                ServiceLocator.downloads.addOrUpdate(uid, item)
+                ServiceLocator.downloadManager.enqueue(item, quality.url)
+                started.value = true
+                onStarted()
+            } catch (e: Exception) {
+                error.value = "Couldn't save the download: ${e.message}"
             }
-            // Persist first so DownloadManager's update() finds the row.
-            val saved = ServiceLocator.downloads.addOrUpdate(uid, item)
-            if (saved.isFailure) {
-                error.value = "Couldn't save the download: " +
-                    (saved.exceptionOrNull()?.message ?: "unknown error")
-                return@launch
-            }
-            ServiceLocator.downloadManager.enqueue(item, quality.url)
-            started.value = true
-            onStarted()
         }
     }
 

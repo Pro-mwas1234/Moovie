@@ -1,4 +1,8 @@
-name: Release
+# Ensure the wrapper is executable (only needed on Unix-like shells)
+chmod +x gradlew
+
+# Build a release APK
+./gradlew assembleReleasename: Release
 
 # Builds a release APK and publishes it to a GitHub Release whenever a tag
 # like v1.2.3 is pushed. The in-app updater reads that same release feed, so
