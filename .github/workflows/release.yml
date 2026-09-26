@@ -42,6 +42,9 @@ jobs:
         with:
           gradle-version: "8.9"
 
+      - name: Ensure gradlew executable
+        run: chmod +x gradlew
+
       - name: Write local.properties from secrets (optional)
         env:
           TMDB_KEY: ${{ secrets.TMDB_API_KEY }}
