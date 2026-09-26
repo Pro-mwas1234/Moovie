@@ -47,15 +47,19 @@ jobs:
           fi
 
       - name: Decode signing keystore
-        if: ${{ secrets.MOOVIE_KEYSTORE_B64 != '' }}
         env:
           MOOVIE_KEYSTORE_B64: ${{ secrets.MOOVIE_KEYSTORE_B64 }}
           MOOVIE_STORE_PASSWORD: ${{ secrets.MOOVIE_STORE_PASSWORD }}
           MOOVIE_KEY_ALIAS: ${{ secrets.MOOVIE_KEY_ALIAS }}
           MOOVIE_KEY_PASSWORD: ${{ secrets.MOOVIE_KEY_PASSWORD }}
         run: |
-          echo "$MOOVIE_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/moovie.keystore"
-          echo "MOOVIE_STORE_FILE=$RUNNER_TEMP/moovie.keystore" >> "$GITHUB_ENV"
+          if [[ -n "$MOOVIE_KEYSTORE_B64" ]]; then
+            echo "$MOOVIE_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/moovie.keystore"
+            echo "MOOVIE_STORE_FILE=$RUNNER_TEMP/moovie.keystore" >> "$GITHUB_ENV"
+            echo "MOOVIE_STORE_PASSWORD=$MOOVIE_STORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "MOOVIE_KEY_ALIAS=$MOOVIE_KEY_ALIAS" >> "$GITHUB_ENV"
+            echo "MOOVIE_KEY_PASSWORD=$MOOVIE_KEY_PASSWORD" >> "$GITHUB_ENV"
+          fi
 
       - name: Build release APK
         run: gradle :app:assembleRelease
