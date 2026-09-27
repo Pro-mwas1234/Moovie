@@ -34,11 +34,11 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      # Installs the Android SDK command-line tools with licenses pre-accepted;
-      # Gradle/AGP then auto-installs the exact platform + build-tools the
-      # project declares, so no pinned components are needed here.
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      # ubuntu-latest runners ship with the Android SDK preinstalled
+      # (platform-tools, build-tools, platforms, accepted licenses), and AGP
+      # auto-installs anything missing. android-actions/setup-android is
+      # deliberately NOT used: its v3 force-runs `sdkmanager tools`, a package
+      # that no longer exists in the SDK repo, which fails every run.
 
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
