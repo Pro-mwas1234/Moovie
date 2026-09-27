@@ -180,7 +180,7 @@ class MovieRepository(private val api: TmdbApi) {
         }.getOrDefault(emptyList())
         return (movies.map { movieToTitle(it) } + tv.map { tvToTitle(it) })
             .filter { !it.name.equals("Untitled", true) }
-            .shuffled()
+            .sortedByDescending { it.rating }
     }
 
     suspend fun surpriseMe(): Title {

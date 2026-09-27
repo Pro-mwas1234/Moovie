@@ -89,7 +89,7 @@ fun AiRecsScreen(nav: NavController, vm: AiRecsViewModel = viewModel()) {
         Column(Modifier.weight(1f).padding(horizontal = 16.dp)) {
             if (history.isEmpty()) {
                 Text(
-                    "Tell me a vibe and I'll find matches 🍿",
+                    "Tell me a vibe and I'll find matches",
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.padding(top = 24.dp),
                 )

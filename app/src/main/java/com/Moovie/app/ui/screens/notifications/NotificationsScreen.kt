@@ -37,7 +37,7 @@ fun NotificationsScreen(nav: NavController) {
         }
         if (items.isEmpty()) {
             Text(
-                "You're all caught up 🎉",
+                "You're all caught up",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(24.dp),
             )

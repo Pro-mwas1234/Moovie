@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -292,7 +293,14 @@ private fun FilterBar(
                     }
                     onChange(selectedGenre, selectedYear, next)
                 },
-                label = { Text(if (selectedRating != null) "★ ${selectedRating}+" else "Rated") },
+                label = { Text(if (selectedRating != null) "${selectedRating}+" else "Rated") },
+                leadingIcon = {
+                    Icon(
+                        Icons.Filled.Star,
+                        null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                },
             )
             val hasFilter = selectedGenre != null || selectedYear != null || selectedRating != null
             if (hasFilter) {

@@ -15,8 +15,11 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Casino
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -47,7 +50,7 @@ class DiscoverViewModel : ViewModel() {
     val results = MutableStateFlow<List<Title>>(emptyList())
     val loading = MutableStateFlow(false)
     val error = MutableStateFlow<String?>(null)
-    val header = MutableStateFlow("🔥 Trending now")
+    val header = MutableStateFlow("Trending now")
     val selectedMood = MutableStateFlow<String?>(null)
     val selectedGenre = MutableStateFlow<Int?>(null)
 
@@ -65,7 +68,7 @@ class DiscoverViewModel : ViewModel() {
         viewModelScope.launch {
             loading.value = true
             error.value = null
-            header.value = "🔥 Trending now"
+            header.value = "Trending now"
             selectedMood.value = null
             selectedGenre.value = null
             try {
@@ -87,7 +90,7 @@ class DiscoverViewModel : ViewModel() {
             error.value = null
             selectedMood.value = id
             selectedGenre.value = null
-            header.value = Moods.ALL.firstOrNull { it.id == id }?.let { "${it.emoji} ${it.label}" } ?: "For you"
+            header.value = Moods.ALL.firstOrNull { it.id == id }?.let { it.label } ?: "For you"
             try {
                 results.value = ServiceLocator.movies.byMood(id)
             } catch (e: Exception) {
@@ -168,7 +171,8 @@ fun DiscoverScreen(nav: NavController, vm: DiscoverViewModel = viewModel()) {
                         FilterChip(
                             selected = selectedMood == m.id,
                             onClick = { vm.toggleMood(m.id) },
-                            label = { Text("${m.emoji} ${m.label}") },
+                            label = { Text(m.label) },
+                            leadingIcon = { Icon(m.icon, null) },
                         )
                     }
                 }
@@ -190,7 +194,8 @@ fun DiscoverScreen(nav: NavController, vm: DiscoverViewModel = viewModel()) {
 
                 Spacer(Modifier.height(4.dp))
                 Button(onClick = { vm.surprise(nav) }, modifier = Modifier.fillMaxWidth()) {
-                    Text("🎲 Surprise Me")
+                    Icon(Icons.Filled.Casino, null)
+                    Text("  Surprise Me")
                 }
                 Spacer(Modifier.height(12.dp))
                 Text(header, style = MaterialTheme.typography.titleMedium)

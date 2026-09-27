@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
@@ -145,7 +146,8 @@ fun PartyIntroScreen(nav: NavController, vm: PartyIntroViewModel = viewModel()) 
         Spacer(Modifier.height(20.dp))
 
         Button(onClick = { showPicker = true }, modifier = Modifier.fillMaxWidth()) {
-            Text("🍿 Host a party")
+            Icon(Icons.Filled.Groups, null)
+            Text("  Host a party")
         }
         hostError?.let {
             Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 4.dp))
@@ -323,7 +325,7 @@ fun PartyRoomScreen(nav: NavController, vm: PartyRoomViewModel = viewModel()) {
                 }
             } else {
                 Text(
-                    if (room?.playing == true) "▶ Playing — press play in your app!" else "⏸ Paused",
+                    if (room?.playing == true) "Playing — press play in your app!" else "Paused",
                     modifier = Modifier.align(Alignment.BottomStart).padding(12.dp),
                     color = MaterialTheme.colorScheme.primary,
                 )

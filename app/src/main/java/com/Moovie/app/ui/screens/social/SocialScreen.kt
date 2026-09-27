@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -164,7 +165,18 @@ fun SocialScreen(nav: NavController, vm: SocialViewModel = viewModel()) {
                             .clip(RoundedCornerShape(8.dp)),
                     )
                     Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                        Text("${review.authorName} · ★ ${review.rating ?: "-"}")
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(review.authorName)
+                            Icon(
+                                Icons.Filled.Star,
+                                null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .padding(start = 6.dp)
+                                    .size(12.dp),
+                            )
+                            Text(" ${review.rating ?: "-"}")
+                        }
                         Text(
                             review.titleName,
                             style = MaterialTheme.typography.titleSmall,

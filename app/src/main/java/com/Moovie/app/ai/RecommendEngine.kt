@@ -58,6 +58,13 @@ class RecommendEngine(private val tmdb: MovieRepository) {
         val stop = setOf(
             "something", "like", "but", "funnier", "scary", "with", "want", "movie",
             "movies", "show", "shows", "similar", "kind", "more", "that", "this",
+            "the", "a", "an", "and", "or", "of", "in", "on", "at", "to", "for",
+            "from", "up", "down", "out", "about", "into", "over", "after",
+            "again", "further", "then", "once", "here", "there", "when", "where",
+            "why", "how", "all", "any", "both", "each", "few", "more", "most",
+            "other", "some", "such", "no", "nor", "not", "only", "own", "same",
+            "so", "than", "too", "very", "can", "will", "just", "don", "should",
+            "now"
         )
         val words = text.replace(Regex("[^\\w\\s-]"), " ").split(Regex("\\s+")).filter { it.length > 2 }
         val seeds = mutableListOf<String>()
@@ -68,7 +75,11 @@ class RecommendEngine(private val tmdb: MovieRepository) {
             }
             i++
         }
-        return seeds.distinct().take(3)
+        // Also consider the first word if capitalized and not stop
+        if (words.isNotEmpty() && words[0][0].isUpperCase() && words[0].lowercase() !in stop) {
+            seeds.add(words[0])
+        }
+        return seeds.distinct().take(5)
     }
 
     fun parse(prompt: String): ParsedPrompt {
@@ -104,18 +115,18 @@ class RecommendEngine(private val tmdb: MovieRepository) {
         val vibePicks = mutableListOf<Title>()
         val vibes = parsed.vibes.ifEmpty { listOf(this.vibes.random()) }
         for (v in vibes.take(2)) {
-            val page = (1..4).random()
+            // Use first page, sorted by rating/popularity via discoverByVibe
             val results = runCatching {
                 tmdb.discoverByVibe(
                     genreIds = v.genreIds,
                     keywordIds = v.keywordIds,
-                    page = page,
+                    page = 1,
                 )
             }.getOrDefault(emptyList())
-            vibePicks += results
+            vibePicks += results.take(6) // take top 6 per vibe
         }
 
-        // Interleave seed recs with vibe picks; fill from popular if thin.
+        // Combine seed recs and vibe picks, limit and fill with popular if neededf needed.
         val picked = (seedResults + vibePicks).distinctBy { it.id }.take(12)
         val filler = if (picked.size < 6) {
             runCatching { tmdb.popular() }.getOrDefault(emptyList())

@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
@@ -132,7 +133,7 @@ fun DetailScreen(nav: NavController, vm: DetailViewModel) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = { showRateDialog = true }, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Filled.Star, null)
-                            Text(if (myRating != null) " Rated $myRating★" else " Rate")
+                            Text(if (myRating != null) " Rated $myRating" else " Rate")
                         }
                         OutlinedButton(
                             onClick = {
@@ -280,20 +281,32 @@ private fun HeroSection(b: com.Moovie.app.data.repo.DetailBundle, onBack: () -> 
             )
             Column(Modifier.padding(start = 12.dp)) {
                 Text(b.title.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text(
-                    buildString {
-                        val bits = mutableListOf<String>()
-                        b.title.year?.let { bits.add(it.toString()) }
-                        b.runtimeMinutes?.let { bits.add("${it / 60}h ${it % 60}m") }
-                        b.seasons?.let { bits.add("$it seasons") }
-                        b.certification?.let { bits.add(it) }
-                        append(bits.joinToString(" · "))
-                        append(if (bits.isEmpty()) "" else " · ")
-                        append("★ %.1f".format(b.title.rating))
-                    },
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        buildString {
+                            val bits = mutableListOf<String>()
+                            b.title.year?.let { bits.add(it.toString()) }
+                            b.runtimeMinutes?.let { bits.add("${it / 60}h ${it % 60}m") }
+                            b.seasons?.let { bits.add("$it seasons") }
+                            b.certification?.let { bits.add(it) }
+                            append(bits.joinToString(" · "))
+                            append(if (bits.isEmpty()) "" else " · ")
+                        },
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Icon(
+                        Icons.Filled.Star,
+                        null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Text(
+                        " %.1f".format(b.title.rating),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
             }
         }
     }

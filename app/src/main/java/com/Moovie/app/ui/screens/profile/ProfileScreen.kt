@@ -12,7 +12,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
@@ -146,19 +151,23 @@ fun ProfileScreen(nav: NavController, vm: ProfileViewModel = viewModel()) {
         item {
             Column(Modifier.padding(horizontal = 16.dp)) {
                 OutlinedButton(onClick = { nav.navigate(Routes.DOWNLOADS) }, modifier = Modifier.fillMaxWidth()) {
-                    Text("⬇️ Downloads")
+                    Icon(Icons.Filled.Download, null)
+                    Text("  Downloads")
                 }
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(onClick = { nav.navigate(Routes.SOCIAL) }, modifier = Modifier.fillMaxWidth()) {
-                    Text("👥 Friends & Feed")
+                    Icon(Icons.Filled.Groups, null)
+                    Text("  Friends & Feed")
                 }
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(onClick = { nav.navigate(Routes.AI_RECS) }, modifier = Modifier.fillMaxWidth()) {
-                    Text("🤖 AI Recommend")
+                    Icon(Icons.Filled.Psychology, null)
+                    Text("  AI Recommend")
                 }
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(onClick = { nav.navigate(Routes.TRIVIA) }, modifier = Modifier.fillMaxWidth()) {
-                    Text("🎉 Trivia Night")
+                    Icon(Icons.AutoMirrored.Filled.Send, null)
+                    Text("  Trivia Night")
                 }
             }
         }
@@ -195,7 +204,18 @@ fun ProfileScreen(nav: NavController, vm: ProfileViewModel = viewModel()) {
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    Text("★ ${r.rating ?: "-"}", color = MaterialTheme.colorScheme.primary)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Filled.Star,
+                            null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Text(
+                            " ${r.rating ?: "-"}",
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 }
             }
         }

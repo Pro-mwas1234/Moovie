@@ -56,7 +56,7 @@ fun PlayerScreen(nav: NavController, vm: PlayerViewModel) {
     val downloaded by vm.downloaded.collectAsState()
     val directStream by vm.directStream.collectAsState()
     // Embed is the primary player; the native MP4 (OmniSave/ExoPlayer) is an
-    // explicit opt-in via the ⚡ toggle. A downloaded local file auto-switches.
+    // explicit opt-in via the bolt toggle. A downloaded local file auto-switches.
     var preferNative by remember { mutableStateOf(false) }
 
     val url = embedUrl(mediaType, vm.idForUi, currentSeason, currentEpisode)
@@ -114,7 +114,7 @@ fun PlayerScreen(nav: NavController, vm: PlayerViewModel) {
         }
 
         // Player: embed is primary; native MP4 only when explicitly toggled
-        // (⚡) or when playing a fully-downloaded local file.
+        // (bolt icon) or when playing a fully-downloaded local file.
         val isLocalFile = directStream?.startsWith("/") == true
         if ((preferNative || isLocalFile) && directStream != null) {
             Column(Modifier.fillMaxWidth().weight(1f)) {
@@ -124,7 +124,7 @@ fun PlayerScreen(nav: NavController, vm: PlayerViewModel) {
                 )
                 if (!isLocalFile) {
                     Text(
-                        "Native stream (OmniSave) — tap ⚡ to switch back to embed",
+                        "Native stream (OmniSave) — tap the bolt icon to switch back to embed",
                         color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.6f),
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),

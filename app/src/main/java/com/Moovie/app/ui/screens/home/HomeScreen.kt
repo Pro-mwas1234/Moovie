@@ -20,11 +20,16 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -44,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -197,7 +203,7 @@ fun HomeScreen(nav: NavController, vm: HomeViewModel = viewModel()) {
                                 status = WatchItem.STATUS_WANT,
                             )
                         ) { ok ->
-                            scope.launch { snackbar.showSnackbar(if (ok) "Added to Watchlist ✓" else "Couldn't add") }
+                            scope.launch { snackbar.showSnackbar(if (ok) "Added to Watchlist" else "Couldn't add") }
                         }
                     },
                 )
@@ -327,14 +333,19 @@ private fun HeroCard(title: Title, inWatchlist: Boolean, onDetails: () -> Unit, 
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                buildString {
-                    append("★ %.1f".format(title.rating))
-                    title.year?.let { append(" · $it") }
-                },
-                color = Color.White.copy(alpha = 0.8f),
-                style = MaterialTheme.typography.labelLarge,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Filled.LocalFireDepartment,
+                    null,
+                    tint = Color.White.copy(alpha = 0.8f),
+                    modifier = Modifier.size(14.dp),
+                )
+                Text(
+                    " ${"%.1f".format(title.rating)}${title.year?.let { " · $it" } ?: ""}",
+                    color = Color.White.copy(alpha = 0.8f),
+                    style = MaterialTheme.typography.labelLarge,
+                )
+            }
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = onDetails) {
@@ -357,12 +368,12 @@ private fun FeatureChips(onAi: () -> Unit, onTrivia: () -> Unit, onParty: () -> 
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(listOf(
-            "🤖 AI Recs" to onAi,
-            "🎉 Trivia" to onTrivia,
-            "🎉 Watch Party" to onParty,
-            "👥 Friends" to onSocial,
-        ), key = { it.first }) { (label, action) ->
-            AssistChip(onClick = action, label = { Text(label) })
+            Triple("AI Recs", Icons.Filled.Psychology, onAi),
+            Triple("Trivia", Icons.Filled.Extension, onTrivia),
+            Triple("Watch Party", Icons.Filled.Groups, onParty),
+            Triple("Friends", Icons.AutoMirrored.Filled.Send, onSocial),
+        ), key = { it.first }) { (label, icon, action) ->
+            AssistChip(onClick = action, label = { Text(label) }, leadingIcon = { Icon(icon, null) })
         }
     }
 }

@@ -106,7 +106,7 @@ fun UpdaterSection(vm: UpdateViewModel = viewModel()) {
             }
 
             UpdateState.UP_TO_DATE -> Text(
-                "You're on the latest version ✓",
+                "You're on the latest version",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary,
             )

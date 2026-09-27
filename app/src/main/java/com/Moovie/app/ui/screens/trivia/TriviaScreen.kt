@@ -3,10 +3,18 @@ package com.Moovie.app.ui.screens.trivia
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -14,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -75,7 +84,18 @@ fun TriviaScreen(nav: NavController, vm: TriviaViewModel = viewModel()) {
     ) {
         if (state.finished) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("🎉 Round over!", style = MaterialTheme.typography.headlineMedium)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Filled.EmojiEvents,
+                        null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(28.dp),
+                    )
+                    Text(
+                        "  Round over!",
+                        style = MaterialTheme.typography.headlineMedium,
+                    )
+                }
                 Text(
                     "You scored ${state.score} / ${state.questions.size}",
                     style = MaterialTheme.typography.titleLarge,
@@ -100,13 +120,16 @@ fun TriviaScreen(nav: NavController, vm: TriviaViewModel = viewModel()) {
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !revealed,
                 ) {
-                    Text(
-                        when {
-                            revealed && isCorrect -> "✓ $option"
-                            revealed && picked -> "✗ $option"
-                            else -> option
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (revealed && isCorrect) {
+                            Icon(Icons.Filled.CheckCircle, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                        } else if (revealed && picked) {
+                            Icon(Icons.Filled.Cancel, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
                         }
-                    )
+                        Text(option)
+                    }
                 }
             }
             if (state.picked != null) {

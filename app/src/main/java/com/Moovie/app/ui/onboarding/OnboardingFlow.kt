@@ -18,8 +18,13 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocalMovies
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
@@ -35,9 +40,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -70,14 +75,14 @@ class OnboardingViewModel : ViewModel() {
     }
 }
 
-private data class Slide(val emoji: String, val headline: String, val body: String)
+private data class Slide(val icon: ImageVector, val headline: String, val body: String)
 
 @Composable
 fun OnboardingFlow(vm: OnboardingViewModel = viewModel()) {
     val slides = listOf(
-        Slide("🎬", "Every movie, one place", "Trending, new releases, hidden gems — browse everything and keep your watchlist in sync."),
-        Slide("🔍", "Find your vibe", "Search, filter, or just say \"something like Inception but funnier\"."),
-        Slide("🍿", "Track what you watch", "Want / Watching / Watched. Rate, review, and see your year in film."),
+        Slide(Icons.Filled.Movie, "Every movie, one place", "Trending, new releases, hidden gems — browse everything and keep your watchlist in sync."),
+        Slide(Icons.Filled.Search, "Find your vibe", "Search, filter, or just say \"something like Inception but funnier\"."),
+        Slide(Icons.Filled.LocalMovies, "Track what you watch", "Want / Watching / Watched. Rate, review, and see your year in film."),
     )
     var step by remember { mutableIntStateOf(0) } // 0..2 slides, 3 = genres, 4 = done
     var selected by remember { mutableStateOf(setOf<Int>()) }
@@ -94,7 +99,12 @@ fun OnboardingFlow(vm: OnboardingViewModel = viewModel()) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    Text(slide.emoji, fontSize = 72.sp)
+                    Icon(
+                        slide.icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(72.dp),
+                    )
                     Spacer(Modifier.height(24.dp))
                     Text(slide.headline, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(12.dp))
@@ -160,7 +170,7 @@ fun OnboardingFlow(vm: OnboardingViewModel = viewModel()) {
                     Button(
                         onClick = { vm.finish(selected) { step = slides.size + 1 } },
                         modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Get Started 🍿") }
+                    ) { Text("Get Started") }
                 }
             }
         }

@@ -1,8 +1,4 @@
-# Ensure the wrapper is executable (only needed on Unix-like shells)
-chmod +x gradlew
-
-# Build a release APK
-./gradlew assembleReleasename: Release
+name: Release
 
 # Builds a release APK and publishes it to a GitHub Release whenever a tag
 # like v1.2.3 is pushed. The in-app updater reads that same release feed, so
@@ -38,12 +34,11 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      # Installs the Android SDK command-line tools with licenses pre-accepted;
+      # Gradle/AGP then auto-installs the exact platform + build-tools the
+      # project declares, so no pinned components are needed here.
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-        with:
-          api-level: 35
-          # Explicitly specify components to avoid trying to install 'tools'
-          components: platforms;android-35,platform-tools
 
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
@@ -69,22 +64,17 @@ jobs:
           MOOVIE_KEY_PASSWORD: ${{ secrets.MOOVIE_KEY_PASSWORD }}
         run: |
           # If a keystore secret is provided, decode it and export the file path.
+          # (Gradle treats a blank MOOVIE_STORE_FILE as "no CI signing".)
           if [[ -n "$MOOVIE_KEYSTORE_B64" ]]; then
             echo "$MOOVIE_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/moovie.keystore"
             echo "MOOVIE_STORE_FILE=$RUNNER_TEMP/moovie.keystore" >> "$GITHUB_ENV"
             echo "MOOVIE_STORE_PASSWORD=$MOOVIE_STORE_PASSWORD" >> "$GITHUB_ENV"
             echo "MOOVIE_KEY_ALIAS=$MOOVIE_KEY_ALIAS" >> "$GITHUB_ENV"
             echo "MOOVIE_KEY_PASSWORD=$MOOVIE_KEY_PASSWORD" >> "$GITHUB_ENV"
-          else
-            # No signing secrets – explicitly unset the vars so Gradle falls back to debug.
-            echo "MOOVIE_STORE_FILE=" >> "$GITHUB_ENV"
-            echo "MOOVIE_STORE_PASSWORD=" >> "$GITHUB_ENV"
-            echo "MOOVIE_KEY_ALIAS=" >> "$GITHUB_ENV"
-            echo "MOOVIE_KEY_PASSWORD=" >> "$GITHUB_ENV"
           fi
 
       - name: Build release APK
-        run: ./gradlew :app:assembleRelease
+        run: ./gradlew :app:assembleRelease --stacktrace
 
       - name: Rename APK
         id: apk
