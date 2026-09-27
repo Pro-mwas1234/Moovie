@@ -56,8 +56,8 @@ android {
         applicationId = "com.Moovie.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.2"
+        versionCode = 4
+        versionName = "1.3"
 
         buildConfigField("String", "TMDB_API_KEY", "\"${localProps.getProperty("tmdb.api.key") ?: ""}\"")
         buildConfigField("String", "OPENAI_API_KEY", "\"${localProps.getProperty("openai.api.key") ?: ""}\"")

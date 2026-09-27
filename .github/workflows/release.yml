@@ -48,12 +48,31 @@ jobs:
       - name: Ensure gradlew executable
         run: chmod +x gradlew
 
-      - name: Write local.properties from secrets (optional)
+      - name: Write local.properties from secrets
         env:
           TMDB_KEY: ${{ secrets.TMDB_API_KEY }}
         run: |
-          if [ -n "$TMDB_KEY" ]; then
-            echo "tmdb.api.key=$TMDB_KEY" > local.properties
+          # TMDB key is required: an APK built without it ships with an empty
+          # key and every movie list fails with "Couldn't load movies".
+          if [ -z "$TMDB_KEY" ]; then
+            echo "::error::Secret TMDB_API_KEY is not set. Add it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          printf 'sdk.dir=%s\ntmdb.api.key=%s\n' "$ANDROID_HOME" "$TMDB_KEY" > local.properties
+
+      - name: Write google-services.json from secret
+        env:
+          GOOGLE_SERVICES_B64: ${{ secrets.GOOGLE_SERVICES_JSON_B64 }}
+        run: |
+          # Optional but recommended: without it the app builds in local-only
+          # mode (no cloud sign-in, no watch parties). Base64-encode your
+          # Firebase config file and store it as the GOOGLE_SERVICES_JSON_B64
+          # secret:   base64 -w0 google-services.json
+          if [ -n "$GOOGLE_SERVICES_B64" ]; then
+            echo "$GOOGLE_SERVICES_B64" | base64 -d > app/google-services.json
+            echo "google-services.json written from secret"
+          else
+            echo "::warning::GOOGLE_SERVICES_JSON_B64 not set - building in local-only mode (no Firebase)."
           fi
 
       - name: Prepare signing variables (always exported)
