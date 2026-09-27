@@ -14,6 +14,8 @@ A streaming application built with Android/Kotlin.
   <a href="https://github.com/Pro-mwas1234/Moovie/releases/latest">
     <img src="https://img.shields.io/github/v/release/Pro-mwas1234/Moovie?style=for-the-badge&logo=github&labelColor=0d0d0d&color=1DB954" alt="version"/>
   </a>
+
+---
 ## Overview
 
 Moovie is a streaming app that allows users to browse, search, and watch movies and TV shows.
