@@ -3,263 +3,203 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Moovie — Find something worth watching</title>
-<meta name="description" content="Moovie is a free Android movie & TV app: trending picks, watchlist sync, offline downloads, AI recommendations and watch parties. Download the latest APK directly.">
-<meta property="og:title" content="Moovie — Find something worth watching">
+<title>Moovie — Download</title>
+<meta name="description" content="Download Moovie, the free Android movie & TV app with offline mode.">
+<meta property="og:title" content="Moovie — Download">
 <meta property="og:description" content="Free Android movie app: discovery, watchlist, offline downloads, AI recs and watch parties. Direct APK download.">
 <meta property="og:type" content="website">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23F5C518'%3E%3Cpath d='M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z'/%3E%3C/svg%3E">
+<link rel="icon" type="image/jpeg" href="logo.jpg">
+<link rel="apple-touch-icon" href="logo.jpg">
 <style>
-  :root {
-    --yellow: #F5C518;
-    --bg: #0D0E12;
-    --surface: #16181F;
-    --surface-2: #1E212B;
-    --text: #F4F5F7;
-    --muted: #9AA0AE;
-    --radius: 16px;
-  }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
+
+  html, body { height: 100%; }
+
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    line-height: 1.6;
-  }
-  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
-
-  /* ---------- Nav ---------- */
-  nav {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 18px 0;
-  }
-  .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.25rem; letter-spacing: -0.02em; }
-  .logo svg { width: 28px; height: 28px; fill: var(--yellow); }
-  .nav-links a { color: var(--muted); text-decoration: none; margin-left: 22px; font-size: 0.95rem; transition: color .15s; }
-  .nav-links a:hover { color: var(--text); }
-
-  /* ---------- Hero ---------- */
-  header { padding: 72px 0 56px; text-align: center; }
-  .badge {
-    display: inline-flex; align-items: center; gap: 8px;
-    background: var(--surface); border: 1px solid #2A2E3A;
-    color: var(--muted); font-size: 0.8rem; padding: 6px 14px;
-    border-radius: 999px; margin-bottom: 22px;
-  }
-  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--yellow); }
-  h1 { font-size: clamp(2.4rem, 6vw, 4rem); font-weight: 900; letter-spacing: -0.03em; line-height: 1.08; }
-  h1 .accent { color: var(--yellow); }
-  .tagline { color: var(--muted); font-size: 1.15rem; max-width: 560px; margin: 18px auto 0; }
-
-  .download-box { margin-top: 36px; }
-  .btn-download {
-    display: inline-flex; align-items: center; gap: 12px;
-    background: var(--yellow); color: #14130D;
-    font-size: 1.15rem; font-weight: 800;
-    padding: 16px 36px; border-radius: 14px;
-    text-decoration: none; border: none; cursor: pointer;
-    box-shadow: 0 8px 30px rgba(245, 197, 25, 0.25);
-    transition: transform .15s, box-shadow .15s;
-  }
-  .btn-download:hover { transform: translateY(-2px); box-shadow: 0 12px 38px rgba(245, 197, 25, 0.35); }
-  .btn-download svg { width: 22px; height: 22px; fill: currentColor; }
-  .btn-download:disabled { opacity: .6; cursor: wait; transform: none; }
-  .dl-meta { margin-top: 14px; color: var(--muted); font-size: 0.9rem; min-height: 1.4em; }
-  .dl-meta b { color: var(--text); }
-  .dl-fallback { display: block; margin-top: 10px; color: var(--muted); font-size: 0.85rem; }
-  .dl-fallback:hover { color: var(--yellow); }
-
-  .poster-strip {
-    display: flex; gap: 14px; justify-content: center;
-    margin: 56px auto 0; max-width: 620px;
-  }
-  .poster {
-    width: 96px; aspect-ratio: 2/3; border-radius: 10px;
-    opacity: .85;
-  }
-  .poster:nth-child(1) { background: linear-gradient(160deg,#3b2f4d,#181320); }
-  .poster:nth-child(2) { background: linear-gradient(160deg,#59421f,#241a0c); transform: translateY(-10px); }
-  .poster:nth-child(3) { background: linear-gradient(160deg,#1f4038,#0c1a17); }
-  .poster:nth-child(4) { background: linear-gradient(160deg,#40272b,#1a0e10); transform: translateY(-10px); }
-  .poster:nth-child(5) { background: linear-gradient(160deg,#2b3550,#10141f); }
-  @media (max-width: 560px) { .poster { width: 64px; } }
-
-  /* ---------- Sections ---------- */
-  section { padding: 56px 0; }
-  h2 { font-size: 1.9rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 8px; }
-  .section-sub { color: var(--muted); margin-bottom: 34px; }
-
-  .features {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 18px;
-  }
-  .card {
-    background: var(--surface); border: 1px solid #232733;
-    border-radius: var(--radius); padding: 26px;
-    transition: border-color .15s, transform .15s;
-  }
-  .card:hover { border-color: #3a3f4f; transform: translateY(-3px); }
-  .card .icon {
-    width: 44px; height: 44px; border-radius: 12px;
-    background: rgba(245,197,25,.12); display: flex;
-    align-items: center; justify-content: center; margin-bottom: 16px;
-  }
-  .card .icon svg { width: 24px; height: 24px; fill: var(--yellow); }
-  .card h3 { font-size: 1.1rem; margin-bottom: 6px; }
-  .card p { color: var(--muted); font-size: 0.95rem; }
-
-  /* ---------- Install steps ---------- */
-  .steps { counter-reset: step; max-width: 640px; }
-  .step {
-    display: flex; gap: 18px; padding: 16px 0;
-    border-bottom: 1px solid #20242f;
-  }
-  .step:last-child { border-bottom: none; }
-  .step::before {
-    counter-increment: step; content: counter(step);
-    flex: 0 0 34px; height: 34px; border-radius: 50%;
-    background: var(--yellow); color: #14130D;
-    font-weight: 800; display: flex; align-items: center; justify-content: center;
-  }
-  .step p b { color: var(--text); }
-  .step p { color: var(--muted); }
-  .note {
-    margin-top: 20px; padding: 14px 18px; border-radius: 12px;
-    background: rgba(245,197,25,.08); border: 1px solid rgba(245,197,25,.25);
-    color: #d8cba0; font-size: 0.9rem;
+    background: #0D0E12;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
   }
 
-  /* ---------- Footer ---------- */
-  footer {
-    border-top: 1px solid #20242f; padding: 32px 0 40px;
-    color: var(--muted); font-size: 0.88rem; text-align: center;
+  /* Logo watermark background — fixed, centered, faded, gently breathing */
+  .logo-bg {
+    position: fixed;
+    inset: 0;
+    background: url("logo.jpg") center 42% / min(72vmin, 560px) no-repeat;
+    opacity: 0.10;
+    filter: saturate(1.1);
+    pointer-events: none;
+    user-select: none;
   }
-  footer a { color: var(--muted); }
-  footer a:hover { color: var(--yellow); }
-  footer .tmdb { display: block; margin-top: 8px; font-size: 0.8rem; }
+
+  /* Soft vignette so text stays readable over the watermark */
+  .vignette {
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse at center, transparent 0%, rgba(13, 14, 18, 0.55) 75%, rgba(13, 14, 18, 0.9) 100%);
+    pointer-events: none;
+  }
+
+  .content {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    padding: 2rem;
+    max-width: 34rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.1rem;
+  }
+
+  .logo {
+    width: 96px;
+    height: 96px;
+    border-radius: 24px;
+    object-fit: cover;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+  }
+
+  h1 {
+    font-size: clamp(2.2rem, 6vw, 3.2rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  .tagline {
+    font-size: clamp(1rem, 2.5vw, 1.15rem);
+    color: rgba(255, 255, 255, 0.65);
+    line-height: 1.5;
+    max-width: 28rem;
+  }
+
+  .download-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.65rem;
+    margin-top: 0.6rem;
+    padding: 1rem 2.2rem;
+    background: #F5C518;
+    color: #14130D;
+    font-size: 1.1rem;
+    font-weight: 700;
+    text-decoration: none;
+    border-radius: 999px;
+    border: none;
+    box-shadow: 0 8px 30px rgba(245, 197, 25, 0.35);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  }
+
+  .download-btn:hover {
+    background: #ffd633;
+    transform: translateY(-2px);
+    box-shadow: 0 12px 38px rgba(245, 197, 25, 0.5);
+  }
+
+  .download-btn:active { transform: translateY(0); }
+
+  .download-btn svg { width: 20px; height: 20px; fill: currentColor; flex-shrink: 0; }
+
+  .meta {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.45);
+    min-height: 1.3em;
+  }
+
+  .alt-link {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.4);
+    text-decoration: none;
+    border-bottom: 1px dotted rgba(255, 255, 255, 0.3);
+  }
+
+  .alt-link:hover { color: rgba(255, 255, 255, 0.7); }
+
+  .requirements {
+    margin-top: 0.8rem;
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.35);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .logo-bg { animation: breathe 9s ease-in-out infinite; }
+    @keyframes breathe {
+      0%, 100% { opacity: 0.10; transform: scale(1); }
+      50%      { opacity: 0.16; transform: scale(1.025); }
+    }
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
+  <div class="logo-bg" aria-hidden="true"></div>
+  <div class="vignette" aria-hidden="true"></div>
 
-  <nav>
-    <div class="logo">
-      <svg viewBox="0 0 24 24"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg>
-      Moovie
-    </div>
-    <div class="nav-links">
-      <a href="#features">Features</a>
-      <a href="#install">Install</a>
-      <a href="https://github.com/Pro-mwas1234/Moovie" target="_blank" rel="noopener">GitHub</a>
-    </div>
-  </nav>
+  <main class="content">
+    <img class="logo" src="logo.jpg" alt="Moovie logo" width="96" height="96">
 
-  <header>
-    <div class="badge"><span class="dot"></span><span id="badge-text">Latest release</span></div>
-    <h1>Every movie,<br>one place. <span class="accent">Free.</span></h1>
-    <p class="tagline">Trending picks, a watchlist that syncs, offline downloads, AI recommendations and watch parties — all in one open-source Android app.</p>
+    <h1>Moovie</h1>
 
-    <div class="download-box">
-      <a class="btn-download" id="dl-btn" href="https://github.com/Pro-mwas1234/Moovie/releases/latest" target="_blank" rel="noopener">
-        <svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"/></svg>
-        <span id="dl-label">Download APK</span>
-      </a>
-      <p class="dl-meta" id="dl-meta">Fetching latest version…</p>
-      <a class="dl-fallback" href="https://github.com/Pro-mwas1234/Moovie/releases" target="_blank" rel="noopener">All releases &amp; changelogs →</a>
-    </div>
+    <p class="tagline">
+      Every movie, one place. Trending picks, a synced watchlist, offline
+      downloads, AI recommendations and watch parties — free and open.
+    </p>
 
-    <div class="poster-strip" aria-hidden="true">
-      <div class="poster"></div><div class="poster"></div><div class="poster"></div><div class="poster"></div><div class="poster"></div>
-    </div>
-  </header>
+    <a class="download-btn" id="dl-btn"
+       href="https://github.com/Pro-mwas1234/Moovie/releases/latest"
+       target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 3v10.586l-3.293-3.293-1.414 1.414L12 16.414l4.707-4.707-1.414-1.414L12 13.586V3h-1.5zM5 19h14v2H5v-2z" transform="translate(0,-1.5)"/>
+      </svg>
+      <span id="btnLabel">Download for Android</span>
+    </a>
 
-  <section id="features">
-    <h2>Everything a movie night needs</h2>
-    <p class="section-sub">Powered by TMDB, with a player that plays nice.</p>
-    <div class="features">
-      <div class="card">
-        <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 2l2.4 7.2H22l-6 4.8 2.4 7.2-6.4-4.8L5.6 21.2 8 14 2 9.2h7.6z"/></svg></div>
-        <h3>Discover &amp; Trending</h3>
-        <p>Browse what's hot, filter by genre, year and rating — or tap a mood and let Moovie pick.</p>
-      </div>
-      <div class="card">
-        <div class="icon"><svg viewBox="0 0 24 24"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg></div>
-        <h3>Watchlist that syncs</h3>
-        <p>Want / Watching / Watched — saved to your account and with you on every device.</p>
-      </div>
-      <div class="card">
-        <div class="icon"><svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"/></svg></div>
-        <h3>Offline downloads</h3>
-        <p>Save movies and episodes to your device and watch them anywhere, no signal needed.</p>
-      </div>
-      <div class="card">
-        <div class="icon"><svg viewBox="0 0 24 24"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/></svg></div>
-        <h3>AI recommendations</h3>
-        <p>Say "something like Inception but funnier" and get real matches from a native recommendation engine.</p>
-      </div>
-      <div class="card">
-        <div class="icon"><svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></div>
-        <h3>Watch parties</h3>
-        <p>Share a 6-character code, sync play state with friends and chat while you stream.</p>
-      </div>
-      <div class="card">
-        <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg></div>
-        <h3>Trivia nights</h3>
-        <p>Quick-fire rounds built from real titles — score points against your own knowledge.</p>
-      </div>
-    </div>
-  </section>
+    <p class="meta" id="meta"></p>
 
-  <section id="install">
-    <h2>Install in under a minute</h2>
-    <p class="section-sub">Moovie ships as a direct APK — no store account required.</p>
-    <div class="steps">
-      <div class="step"><p><b>Download the APK</b> using the button above.</p></div>
-      <div class="step"><p><b>Allow installs from this source.</b> When Android asks, permit your browser to install unknown apps (Settings → Apps → Special access → Install unknown apps).</p></div>
-      <div class="step"><p><b>Open the APK</b> and tap Install. Moovie needs no special permissions to start browsing.</p></div>
-      <div class="step"><p><b>Update from inside the app.</b> Moovie checks new releases automatically and offers one-tap updates.</p></div>
-    </div>
-    <div class="note">Tip: Google Play Protect may show a first-run warning for sideloaded apps — this is normal for any app installed outside the Play Store.</div>
-  </section>
+    <a class="alt-link" href="https://github.com/Pro-mwas1234/Moovie/releases" target="_blank" rel="noopener">
+      All releases
+    </a>
 
-  <footer>
-    <p><a href="https://github.com/Pro-mwas1234/Moovie" target="_blank" rel="noopener">Source on GitHub</a> · <a href="https://github.com/Pro-mwas1234/Moovie/releases" target="_blank" rel="noopener">Releases</a></p>
-    <span class="tmdb">This product uses the TMDB API but is not endorsed or certified by TMDB. Movie data and images © The Movie Database Ltd.</span>
-  </footer>
-</div>
+    <p class="requirements">Requires Android 9 (Pie) or newer · arm64 / arm32</p>
+  </main>
 
 <script>
 (function () {
-  var REPO = "Pro-mwas1234/Moovie";
+  // Default state: the button is a plain, working link to the releases page.
+  // This means the download ALWAYS works, even if JS or the API fails.
+  // When the GitHub API responds successfully, we upgrade the button to a
+  // direct download link pointing at the real APK asset — no filename guessing.
+  var API = "https://api.github.com/repos/Pro-mwas1234/Moovie/releases/latest";
   var btn = document.getElementById("dl-btn");
-  var label = document.getElementById("dl-label");
-  var meta = document.getElementById("dl-meta");
-  var badge = document.getElementById("badge-text");
+  var label = document.getElementById("btnLabel");
+  var meta = document.getElementById("meta");
 
-  function fmtSize(bytes) {
-    if (!bytes) return "";
-    var mb = bytes / (1024 * 1024);
-    return mb >= 1 ? mb.toFixed(1) + " MB" : Math.round(bytes / 1024) + " KB";
-  }
+  fetch(API, { headers: { Accept: "application/vnd.github+json" } })
+    .then(function (res) { return res.ok ? res.json() : null; })
+    .then(function (release) {
+      if (!release) return;
 
-  fetch("https://api.github.com/repos/" + REPO + "/releases/latest", {
-    headers: { "Accept": "application/vnd.github+json" }
-  })
-    .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-    .then(function (rel) {
-      var apk = (rel.assets || []).find(function (a) { return /\.apk$/i.test(a.name || ""); });
-      if (!apk) throw new Error("no apk asset");
+      var apk = (release.assets || []).find(function (a) {
+        return /\.apk$/i.test(a.name || "");
+      });
+      if (!apk) return;
+
+      // Point the button at the REAL APK asset and let it download directly
       btn.href = apk.browser_download_url;
       btn.removeAttribute("target"); // let Android treat it as a direct download
-      label.textContent = "Download for Android";
-      badge.textContent = (rel.tag_name || "") + " · latest";
-      meta.innerHTML = "Version <b>" + (rel.tag_name || "").replace(/^v/, "") + "</b>" +
-        (apk.size ? " · " + fmtSize(apk.size) : "") +
-        (rel.published_at ? " · published " + new Date(rel.published_at).toLocaleDateString() : "");
+
+      var tag = release.tag_name || "latest";
+      label.textContent =
+        "Download v" + tag + " · " + (apk.size / 1048576).toFixed(1) + " MB";
+      meta.textContent = "Latest release: " + tag;
     })
     .catch(function () {
-      meta.textContent = "Couldn't reach GitHub — use the button to open the releases page.";
+      // Silent — the plain link to the releases page already works as a fallback.
     });
 })();
 </script>
