@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Any signed-in account (including anonymous guests).
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    // Only the user's own document tree.
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // ---------- Per-user data: users/{uid}/watchlist, /following, /notifications ----------
+
+    match /users/{uid}/watchlist/{docId} {
+      allow read, write: if isOwner(uid);
+    }
+
+    match /users/{uid}/following/{targetUid} {
+      allow read, write: if isOwner(uid);
+    }
+
+    match /users/{uid}/notifications/{docId} {
+      allow read: if isOwner(uid);
+      // Followers create notifications in someone else's space.
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.type == 'new_follower';
+      allow update, delete: if isOwner(uid);
+    }
+
+    // ---------- Reviews: public to read, authors manage their own ----------
+
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.text is string
+        && request.resource.data.text.size() <= 2000;
+      allow update, delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    // ---------- Profiles: public to read, owner to edit ----------
+
+    match /profiles/{uid} {
+      allow read: if true;
+      allow create, update: if isOwner(uid) && request.resource.data.uid == uid;
+      allow delete: if false;
+    }
+
+    // ---------- Watch parties: anyone signed in can join; host controls playback ----------
+
+    match /watch_parties/{code} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.hostUid == request.auth.uid;
+      // Joiners merge their uid into participants; host updates playback state.
+      allow update: if isSignedIn()
+        && (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants'])
+          || resource.data.hostUid == request.auth.uid
+        );
+      allow delete: if resource.data.hostUid == request.auth.uid;
+
+      match /messages/{msgId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid
+          && request.resource.data.text is string
+          && request.resource.data.text.size() <= 500;
+        allow update, delete: if false;
+      }
+    }
+
+    // ---------- Default deny everything else ----------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

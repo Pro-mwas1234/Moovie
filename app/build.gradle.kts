@@ -56,8 +56,8 @@ android {
         applicationId = "com.Moovie.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.3"
+        versionCode = 5
+        versionName = "1.4"
 
         buildConfigField("String", "TMDB_API_KEY", "\"${localProps.getProperty("tmdb.api.key") ?: ""}\"")
         buildConfigField("String", "OPENAI_API_KEY", "\"${localProps.getProperty("openai.api.key") ?: ""}\"")
@@ -74,18 +74,27 @@ android {
                 keyPassword = System.getenv("MOOVIE_KEY_PASSWORD")
             }
         }
+        // Committed so all builds (local + CI) share one stable signature.
+        create("committed") {
+            storeFile = file("../keystore/moovie-release.jks")
+            storePassword = "moovie-release"
+            keyAlias = "moovie"
+            keyPassword = "moovie-release"
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // CI signs with secrets when present; locally this falls back to the
-            // debug key so `assembleRelease` still produces an installable APK.
-            signingConfig = if (System.getenv("MOOVIE_STORE_FILE") != null) {
-                signingConfigs.getByName("ci")
-            } else {
-                signingConfigs.getByName("debug")
+            // Signing priority: CI secrets > committed release keystore > debug.
+            // The committed keystore keeps every release signed with the SAME
+            // key, so in-app updates install over the old version instead of
+            // colliding ("App not installed" signature mismatch).
+            signingConfig = when {
+                System.getenv("MOOVIE_STORE_FILE") != null -> signingConfigs.getByName("ci")
+                file("../keystore/moovie-release.jks").exists() -> signingConfigs.getByName("committed")
+                else -> signingConfigs.getByName("debug")
             }
         }
     }

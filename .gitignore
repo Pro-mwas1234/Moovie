@@ -11,5 +11,10 @@ local.properties
 captures/
 .externalNativeBuild/
 .cxx/
+build.log
+run.json
+hs_err_pid*.log
+replay_pid*.log
+tools/set_secrets.py
 # Firebase config holds project identifiers; commit intentionally if you want it shared
 app/google-services.json

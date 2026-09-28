@@ -7,11 +7,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -24,6 +26,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.Moovie.app.BuildConfig
+import com.Moovie.app.ServiceLocator
 import com.Moovie.app.data.update.ApkInstaller
 import com.Moovie.app.data.update.UpdateChecker
 import com.Moovie.app.data.update.UpdateInfo
@@ -53,14 +56,15 @@ class UpdateViewModel : ViewModel() {
         }
     }
 
-    fun downloadAndInstall(context: Context) {
-        val info = update.value ?: return
+    fun downloadAndInstall(context: Context, info: UpdateInfo? = update.value) {
+        val target = info ?: return
         if (state.value == UpdateState.DOWNLOADING) return
+        update.value = target
         viewModelScope.launch {
             state.value = UpdateState.DOWNLOADING
             progress.value = 0
             message.value = null
-            val file = checker.downloadApk(context, info.apkUrl) { pct -> progress.value = pct }
+            val file = checker.downloadApk(context, target.apkUrl) { pct -> progress.value = pct }
             if (file != null && file.exists() && file.length() > 0L) {
                 apkFile = file
                 state.value = UpdateState.READY
@@ -75,6 +79,48 @@ class UpdateViewModel : ViewModel() {
     /** Re-launches the installer if the user dismissed the first prompt. */
     fun installNow(context: Context) {
         apkFile?.let { ApkInstaller.install(context, it) }
+    }
+}
+
+/**
+ * Dialog shown anywhere in the app when the background 5h poller finds a newer
+ * release. Reuses UpdateViewModel so "Download & install" shares one flow.
+ */
+@Composable
+fun UpdateAvailableDialog(vm: UpdateViewModel = viewModel()) {
+    val poller = ServiceLocator.updatePoller
+    val pending by poller.update.collectAsState()
+    val dismissed by poller.dismissedTag.collectAsState()
+    val state by vm.state.collectAsState()
+    val context = LocalContext.current
+
+    val info = pending
+    if (info != null && info.tagName != dismissed) {
+        AlertDialog(
+            onDismissRequest = { poller.dismiss() },
+            title = { Text("Update available") },
+            text = {
+                Text("Moovie ${info.tagName} is out. Install it to get the latest fixes — no need to uninstall, your data stays.")
+            },
+            confirmButton = {
+                Button(onClick = {
+                    vm.downloadAndInstall(context, info)
+                }) { Text("Update") }
+            },
+            dismissButton = {
+                TextButton(onClick = { poller.dismiss() }) { Text("Not now") }
+            },
+        )
+    }
+    // Downloading progress surfaces via the same VM inside Settings; while a
+    // dialog-triggered download runs, show a slim progress dialog.
+    if (state == UpdateState.DOWNLOADING && info != null && info.tagName != dismissed) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Downloading update…") },
+            text = { LinearProgressIndicator(modifier = Modifier.fillMaxWidth()) },
+            confirmButton = {},
+        )
     }
 }
 

@@ -51,6 +51,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class SearchUi(
@@ -89,6 +90,9 @@ class SearchViewModel : ViewModel() {
     val recentSearches = MutableStateFlow<List<String>>(emptyList())
     private val queryFlow = MutableStateFlow("")
 
+    /** Increments on every new search; older responses are discarded. */
+    private var searchSeq = 0
+
     init {
         @OptIn(FlowPreview::class)
         queryFlow.debounce(300).onEach { q ->
@@ -103,38 +107,43 @@ class SearchViewModel : ViewModel() {
     }
 
     fun onQueryChange(q: String) {
-        state.value = state.value.copy(query = q)
+        // update {} is atomic: never writes back a stale snapshot, so typed
+        // characters can't be reverted by an in-flight search finishing.
+        state.update { it.copy(query = q) }
         queryFlow.value = q
     }
 
     fun setTab(tab: Int) {
-        state.value = state.value.copy(tab = tab)
+        state.update { it.copy(tab = tab) }
         if (state.value.query.length >= 2) executeSearch(state.value.query)
     }
 
     fun setFilter(genreId: Int?, year: Int?, minRating: Double?) {
-        state.value = state.value.copy(genreId = genreId, year = year, minRating = minRating)
+        state.update { it.copy(genreId = genreId, year = year, minRating = minRating) }
         if (state.value.query.length >= 2) executeSearch(state.value.query)
     }
 
     private fun resetResults() {
-        state.value = state.value.copy(results = emptyList(), people = emptyList(), searched = false, error = null)
+        state.update { it.copy(results = emptyList(), people = emptyList(), searched = false, error = null) }
     }
 
     private fun executeSearch(q: String) {
+        val seq = ++searchSeq
+        val tab = state.value.tab
         viewModelScope.launch {
-            state.value = state.value.copy(loading = true, error = null)
+            state.update { it.copy(loading = true, error = null) }
             try {
-                val s = state.value
-                when (s.tab) {
-                    1 -> state.value = s.copy(
-                        results = ServiceLocator.movies.searchMoviesOnly(q),
-                        people = emptyList(), loading = false, searched = true,
-                    )
-                    2 -> state.value = s.copy(
-                        results = ServiceLocator.movies.searchTvOnly(q),
-                        people = emptyList(), loading = false, searched = true,
-                    )
+                when (tab) {
+                    1 -> {
+                        val results = ServiceLocator.movies.searchMoviesOnly(q)
+                        if (seq != searchSeq) return@launch
+                        state.update { it.copy(results = results, people = emptyList(), loading = false, searched = true) }
+                    }
+                    2 -> {
+                        val results = ServiceLocator.movies.searchTvOnly(q)
+                        if (seq != searchSeq) return@launch
+                        state.update { it.copy(results = results, people = emptyList(), loading = false, searched = true) }
+                    }
                     3 -> {
                         val people = ServiceLocator.movies.searchPeopleOnly(q).map { p ->
                             SearchPersonUi(
@@ -144,10 +153,12 @@ class SearchViewModel : ViewModel() {
                                 knownFor = p.knownFor.mapNotNull { knownForTitle(it) },
                             )
                         }
-                        state.value = s.copy(results = emptyList(), people = people, loading = false, searched = true)
+                        if (seq != searchSeq) return@launch
+                        state.update { it.copy(results = emptyList(), people = people, loading = false, searched = true) }
                     }
                     else -> {
                         var results = ServiceLocator.movies.search(q)
+                        val s = state.value
                         val needsFilter = s.genreId != null || s.year != null || s.minRating != null
                         if (needsFilter && results.size < 6) {
                             results = ServiceLocator.movies.filterTitles(s.genreId, s.year, s.minRating)
@@ -158,13 +169,15 @@ class SearchViewModel : ViewModel() {
                                     (s.minRating == null || t.rating >= s.minRating!!)
                             }
                         }
-                        state.value = s.copy(results = results, people = emptyList(), loading = false, searched = true)
+                        if (seq != searchSeq) return@launch
+                        state.update { it.copy(results = results, people = emptyList(), loading = false, searched = true) }
                         ServiceLocator.prefs.addRecentSearch(q)
                         ServiceLocator.prefs.addTrendingSearch(q)
                     }
                 }
             } catch (e: Exception) {
-                state.value = state.value.copy(loading = false, error = "Search failed: ${e.message}")
+                if (seq != searchSeq) return@launch
+                state.update { it.copy(loading = false, error = "Search failed: ${e.message}") }
             }
         }
     }

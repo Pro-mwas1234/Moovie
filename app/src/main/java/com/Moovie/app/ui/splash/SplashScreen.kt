@@ -35,8 +35,8 @@ fun SplashScreen() {
                 painterResource(R.drawable.splash_logo),
                 contentDescription = null,
                 modifier = Modifier
-                    .size(120.dp)
-                    .clip(RoundedCornerShape(24.dp)),
+                    .size(96.dp)
+                    .clip(RoundedCornerShape(20.dp)),
             )
             Text(
                 "Moovie",

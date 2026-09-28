@@ -25,6 +25,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.Moovie.app.ServiceLocator
 import com.Moovie.app.ui.screens.auth.AuthScreen
+import com.Moovie.app.ui.screens.settings.UpdateAvailableDialog
 import com.Moovie.app.ui.screens.detail.DetailScreen
 import com.Moovie.app.ui.screens.detail.DetailViewModel
 import com.Moovie.app.ui.screens.discover.DiscoverScreen
@@ -88,6 +89,8 @@ fun RootNav() {
     val backStack by nav.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
     val showBars = currentRoute in tabs.map { it.route }
+
+    UpdateAvailableDialog()
 
     Scaffold(
         bottomBar = {

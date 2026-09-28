@@ -56,9 +56,11 @@ class WatchlistViewModel : ViewModel() {
     val items = MutableStateFlow<List<WatchItem>>(emptyList())
 
     init {
-        val uid = ServiceLocator.auth.uid
-        if (uid != null) {
-            viewModelScope.launch {
+        // ensureUid mints a guest session when none exists so the list is real,
+        // instead of showing an empty watchlist forever when uid was null.
+        viewModelScope.launch {
+            val uid = ServiceLocator.auth.ensureUid()
+            if (uid != null) {
                 ServiceLocator.watchlist.watchlist(uid).collect { items.value = it }
             }
         }

@@ -47,6 +47,10 @@ object ServiceLocator {
     lateinit var downloadManager: DownloadManager
         private set
 
+    /** Background update checker (launch + every 5h). */
+    lateinit var updatePoller: com.Moovie.app.data.update.UpdatePoller
+        private set
+
     fun init(context: Context) {
         prefs = PrefsRepository(context)
         tmdb = TmdbClient.create()
@@ -58,5 +62,7 @@ object ServiceLocator {
         watchParty = WatchPartyRepository()
         recommend = RecommendEngine(movies)
         downloadManager = DownloadManager(context.applicationContext)
+        updatePoller = com.Moovie.app.data.update.UpdatePoller(appScope)
+        updatePoller.start()
     }
 }
