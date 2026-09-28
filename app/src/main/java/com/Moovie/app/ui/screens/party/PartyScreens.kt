@@ -225,16 +225,21 @@ fun PartyIntroScreen(nav: NavController, vm: PartyIntroViewModel = viewModel()) 
 class PartyRoomViewModel : ViewModel() {
     val state = MutableStateFlow<com.Moovie.app.data.model.PartyRoomState?>(null)
     val messages = MutableStateFlow<List<ChatMessage>>(emptyList())
+    val roomError = MutableStateFlow<String?>(null)
     var code: String = ""
 
     fun bind(roomCode: String) {
         if (code == roomCode) return
         code = roomCode
         viewModelScope.launch {
-            ServiceLocator.watchParty.roomState(roomCode).collect { state.value = it }
+            runCatching {
+                ServiceLocator.watchParty.roomState(roomCode).collect { state.value = it }
+            }.onFailure { roomError.value = it.message }
         }
         viewModelScope.launch {
-            ServiceLocator.watchParty.chat(roomCode).collect { messages.value = it }
+            runCatching {
+                ServiceLocator.watchParty.chat(roomCode).collect { messages.value = it }
+            }.onFailure { roomError.value = it.message }
         }
     }
 
@@ -253,11 +258,21 @@ class PartyRoomViewModel : ViewModel() {
 }
 
 @Composable
-fun PartyRoomScreen(nav: NavController, vm: PartyRoomViewModel = viewModel()) {
-    val code = nav.currentBackStackEntry?.arguments?.getString("code") ?: ""
-    vm.bind(code)
+fun PartyRoomScreen(
+    nav: NavController,
+    roomCode: String,
+    vm: PartyRoomViewModel = viewModel(),
+) {
+    // The code comes from THIS screen's back stack entry (wired in RootNav),
+    // not currentBackStackEntry — the latter returns whatever screen is on top
+    // (e.g. the player after "Watch now"), whose args have no code → the old
+    // bind("") crashed on Firestore with an empty document path.
+    if (roomCode.isNotBlank()) {
+        androidx.compose.runtime.LaunchedEffect(roomCode) { vm.bind(roomCode) }
+    }
     val state by vm.state.collectAsState()
     val messages by vm.messages.collectAsState()
+    val roomError by vm.roomError.collectAsState()
     var chatInput by remember { mutableStateOf("") }
     // Ticks every second so the shared clock re-reads the room's timestamp.
     var tick by remember { mutableStateOf(0L) }
@@ -282,7 +297,7 @@ fun PartyRoomScreen(nav: NavController, vm: PartyRoomViewModel = viewModel()) {
             Column {
                 Text(room?.titleName ?: "Watch Party", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text(
-                    "Code: ${room?.code ?: code} · ${room?.participants?.size ?: 1} here",
+                    "Code: ${room?.code ?: roomCode} · ${room?.participants?.size ?: 1} here",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -356,6 +371,14 @@ fun PartyRoomScreen(nav: NavController, vm: PartyRoomViewModel = viewModel()) {
             Text(" Watch now")
         }
 
+        roomError?.let {
+            Text(
+                "Party connection issue: $it",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+        }
         Text(
             "Chat",
             style = MaterialTheme.typography.titleSmall,

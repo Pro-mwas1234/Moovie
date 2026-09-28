@@ -88,10 +88,12 @@ class WatchPartyRepository {
     }
 
     fun roomState(code: String): Flow<PartyRoomState> {
+        val normalized = code.trim().uppercase()
+        require(normalized.isNotBlank()) { "Empty party code" }
         val c = roomsCol()
         if (c == null) return local.roomFlow(code.uppercase())
         return callbackFlow {
-            val reg = c.document(code.uppercase())
+            val reg = c.document(normalized)
                 .addSnapshotListener { snap, err ->
                     if (err != null) { close(err); return@addSnapshotListener }
                     val r = snap?.data?.let { roomFromMap(snap.id, it) }
@@ -118,8 +120,10 @@ class WatchPartyRepository {
     }
 
     fun chat(code: String): Flow<List<ChatMessage>> {
-        val c = chatCol(code.uppercase())
-        if (c == null) return local.chatFlow(code.uppercase())
+        val normalized = code.trim().uppercase()
+        require(normalized.isNotBlank()) { "Empty party code" }
+        val c = chatCol(normalized)
+        if (c == null) return local.chatFlow(normalized)
         return callbackFlow {
             val reg = c.addSnapshotListener { snap, err ->
                 if (err != null) { close(err); return@addSnapshotListener }
@@ -140,9 +144,13 @@ class WatchPartyRepository {
     }
 
     suspend fun sendChat(code: String, uid: String, name: String, text: String): Result<Unit> = runCatching {
-        val c = chatCol(code.uppercase()) ?: run {
-            val flow = local.chatFlow(code.uppercase())
+        val normalized = code.trim().uppercase()
+        require(normalized.isNotBlank()) { "Empty party code" }
+        val c = chatCol(normalized) ?: run {
+            val flow = local.chatFlow(normalized)
+            // Unique id per message: LazyColumn keys crash on duplicates.
             flow.value = flow.value + ChatMessage(
+                id = java.util.UUID.randomUUID().toString(),
                 uid = uid, name = name, text = text,
                 createdAt = com.google.firebase.Timestamp.now(),
             )

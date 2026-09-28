@@ -154,7 +154,9 @@ fun RootNav() {
             composable(
                 Routes.PARTY_ROOM,
                 arguments = listOf(navArgument("code") { type = NavType.StringType }),
-            ) { PartyRoomScreen(nav) }
+            ) { entry ->
+                PartyRoomScreen(nav, entry.arguments?.getString("code").orEmpty())
+            }
             composable(
                 Routes.PLAYER,
                 arguments = listOf(

@@ -79,6 +79,10 @@ data class HomeUi(
     val trending: List<Title> = emptyList(),
     val newReleases: List<Title> = emptyList(),
     val top10: List<Title> = emptyList(),
+    val trendingTv: List<Title> = emptyList(),
+    val popular: List<Title> = emptyList(),
+    val comingSoon: List<Title> = emptyList(),
+    val topTv: List<Title> = emptyList(),
     val becauseYouLiked: Pair<String, List<Title>>? = null,
     val error: String? = null,
 )
@@ -102,11 +106,19 @@ class HomeViewModel : ViewModel() {
                     val trending = async { ServiceLocator.movies.trendingToday() }
                     val fresh = async { ServiceLocator.movies.newReleases() }
                     val top = async { ServiceLocator.movies.trendingWeek() }
+                    val tv = async { runCatching { ServiceLocator.movies.trendingTvWeek() }.getOrDefault(emptyList()) }
+                    val popular = async { runCatching { ServiceLocator.movies.popular() }.getOrDefault(emptyList()) }
+                    val soon = async { runCatching { ServiceLocator.movies.upcoming() }.getOrDefault(emptyList()) }
+                    val topTv = async { runCatching { ServiceLocator.movies.topRatedTv() }.getOrDefault(emptyList()) }
                     state.value = HomeUi(
                         hero = hero.await(),
                         trending = trending.await(),
                         newReleases = fresh.await(),
                         top10 = top.await().take(10),
+                        trendingTv = tv.await().take(20),
+                        popular = popular.await().take(20),
+                        comingSoon = soon.await().take(20),
+                        topTv = topTv.await().take(20),
                     )
                 }
                 loadBecauseYouLiked()
@@ -241,6 +253,10 @@ fun HomeScreen(nav: NavController, vm: HomeViewModel = viewModel()) {
 
         item { MovieRow("Trending Now", state.trending, onTitleClick = { t -> nav.navigate(Routes.detail(t.mediaType, t.id)) }) }
         item { MovieRow("New Releases", state.newReleases, onTitleClick = { t -> nav.navigate(Routes.detail(t.mediaType, t.id)) }) }
+        item { MovieRow("Trending TV Shows", state.trendingTv, onTitleClick = { t -> nav.navigate(Routes.detail(t.mediaType, t.id)) }) }
+        item { MovieRow("Popular Movies", state.popular, onTitleClick = { t -> nav.navigate(Routes.detail(t.mediaType, t.id)) }) }
+        item { MovieRow("Coming Soon", state.comingSoon, onTitleClick = { t -> nav.navigate(Routes.detail(t.mediaType, t.id)) }) }
+        item { MovieRow("Top Rated TV", state.topTv, onTitleClick = { t -> nav.navigate(Routes.detail(t.mediaType, t.id)) }) }
 
         // Top 10 with big rank numbers
         if (state.top10.isNotEmpty()) {
