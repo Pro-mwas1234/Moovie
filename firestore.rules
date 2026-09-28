@@ -23,10 +23,14 @@ service cloud.firestore {
 
     match /users/{uid}/notifications/{docId} {
       allow read: if isOwner(uid);
-      // Followers create notifications in someone else's space.
+      // Followers create notifications in someone else's space, but only the
+      // exact kind the app sends (anti-spam: bounded text, unread, fixed type).
       allow create: if isSignedIn()
         && request.resource.data.uid == request.auth.uid
-        && request.resource.data.type == 'new_follower';
+        && request.resource.data.type == 'new_follower'
+        && request.resource.data.text is string
+        && request.resource.data.text.size() <= 200
+        && request.resource.data.read == false;
       allow update, delete: if isOwner(uid);
     }
 
