@@ -16,23 +16,28 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.Moovie.app.data.model.Title
+import com.Moovie.app.data.model.WatchItem
 import com.Moovie.app.data.remote.TmdbClient
 
 @Composable
@@ -95,6 +100,115 @@ fun MovieRow(titleText: String, titles: List<Title>, modifier: Modifier = Modifi
                 PosterCard(t) { onTitleClick(t) }
             }
         }
+    }
+}
+
+/**
+ * In-progress titles with poster, play badge, S/E chip and a progress bar.
+ * Tapping resumes the player directly. Shared by Home, Watchlist and Profile.
+ */
+@Composable
+fun ContinueWatchingRow(items: List<WatchItem>, modifier: Modifier = Modifier, onPlay: (WatchItem) -> Unit) {
+    if (items.isEmpty()) return
+    Column(modifier) {
+        Text(
+            "Continue Watching",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items(items, key = { it.key }) { w ->
+                ContinueWatchingCard(w, onPlay)
+            }
+        }
+    }
+}
+
+@Composable
+fun ContinueWatchingCard(w: WatchItem, onPlay: (WatchItem) -> Unit) {
+    val runtime = w.runtimeMinutes ?: 110
+    val fraction = (w.progressMinutes ?: 0).toFloat() / runtime.toFloat()
+    Column(
+        modifier = Modifier
+            .width(130.dp)
+            .clickable { onPlay(w) },
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(2f / 3f)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+        ) {
+            AsyncImage(
+                model = TmdbClient.posterUrl(w.posterPath),
+                contentDescription = w.titleName,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            // Play badge makes the "tap to resume" affordance obvious.
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.55f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Filled.PlayArrow,
+                    contentDescription = "Resume ${w.titleName}",
+                    tint = Color.White,
+                    modifier = Modifier.size(28.dp),
+                )
+            }
+            if (w.mediaType == "tv") {
+                Text(
+                    "S${w.season ?: 1} · E${w.episode ?: 1}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp)
+                        .background(
+                            Color.Black.copy(alpha = 0.55f),
+                            RoundedCornerShape(6.dp),
+                        )
+                        .padding(horizontal = 5.dp, vertical = 2.dp),
+                )
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            w.titleName,
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        // Progress bar + "Xm left" — the whole point of this row.
+        LinearProgressIndicator(
+            progress = { fraction.coerceIn(0f, 1f) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp)
+                .height(4.dp)
+                .clip(RoundedCornerShape(2.dp)),
+            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+        )
+        val left = (runtime - (w.progressMinutes ?: 0)).coerceAtLeast(0)
+        Text(
+            when {
+                w.mediaType == "tv" -> "Episode ${w.episode ?: 1} · ${left}m left"
+                left > 0 -> "$left min left"
+                else -> "Finish it up"
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 2.dp),
+        )
     }
 }
 

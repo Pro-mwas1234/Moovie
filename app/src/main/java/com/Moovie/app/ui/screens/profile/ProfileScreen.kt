@@ -47,7 +47,7 @@ import com.Moovie.app.data.model.Title
 import com.Moovie.app.data.model.WatchItem
 import com.Moovie.app.data.repo.WatchStats
 import com.Moovie.app.data.remote.TmdbClient
-import com.Moovie.app.ui.components.MovieRow
+import com.Moovie.app.ui.components.ContinueWatchingRow
 import com.Moovie.app.ui.navigation.Routes
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -57,6 +57,7 @@ class ProfileViewModel : ViewModel() {
     val stats = MutableStateFlow(WatchStats())
     val myReviews = MutableStateFlow<List<ReviewPost>>(emptyList())
     val favorites = MutableStateFlow<List<WatchItem>>(emptyList())
+    val continueWatching = MutableStateFlow<List<WatchItem>>(emptyList())
 
     init {
         viewModelScope.launch {
@@ -67,6 +68,10 @@ class ProfileViewModel : ViewModel() {
             launch {
                 ServiceLocator.watchlist.watchlist(uid).collect { items ->
                     favorites.value = items.filter { it.rating >= 4.0 || it.status == WatchItem.STATUS_WATCHED }
+                    continueWatching.value = items.filter {
+                        it.status != WatchItem.STATUS_WATCHED &&
+                            (it.status == WatchItem.STATUS_WATCHING || it.progressMinutes != null)
+                    }
                     stats.value = ServiceLocator.watchlist.stats(items, myReviews.value.size)
                 }
             }
@@ -86,6 +91,7 @@ fun ProfileScreen(nav: NavController, vm: ProfileViewModel = viewModel()) {
     val account = accountState
     val stats by vm.stats.collectAsState()
     val reviews by vm.myReviews.collectAsState()
+    val continueWatching by vm.continueWatching.collectAsState()
 
     LazyColumn(Modifier.fillMaxSize()) {
         item {
@@ -147,6 +153,15 @@ fun ProfileScreen(nav: NavController, vm: ProfileViewModel = viewModel()) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(16.dp),
             )
+        }
+
+        if (continueWatching.isNotEmpty()) {
+            item {
+                ContinueWatchingRow(
+                    continueWatching,
+                    onPlay = { w -> nav.navigate(Routes.player(w.mediaType, w.tmdbId, w.season ?: 1, w.episode ?: 1)) },
+                )
+            }
         }
 
         item {

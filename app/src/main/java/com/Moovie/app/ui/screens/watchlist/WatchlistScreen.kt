@@ -48,6 +48,7 @@ import coil.compose.AsyncImage
 import com.Moovie.app.ServiceLocator
 import com.Moovie.app.data.model.WatchItem
 import com.Moovie.app.data.remote.TmdbClient
+import com.Moovie.app.ui.components.ContinueWatchingRow
 import com.Moovie.app.ui.navigation.Routes
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -88,6 +89,10 @@ fun WatchlistScreen(nav: NavController, vm: WatchlistViewModel = viewModel()) {
         0 -> items.filter { it.status == WatchItem.STATUS_WANT }
         1 -> items.filter { it.status == WatchItem.STATUS_WATCHING }
         else -> items.filter { it.status == WatchItem.STATUS_WATCHED }
+    }
+    val continueWatching = items.filter {
+        it.status != WatchItem.STATUS_WATCHED &&
+            (it.status == WatchItem.STATUS_WATCHING || it.progressMinutes != null)
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -130,11 +135,20 @@ fun WatchlistScreen(nav: NavController, vm: WatchlistViewModel = viewModel()) {
                 }
             }
         } else {
+            Column(Modifier.fillMaxSize()) {
+                // Watching tab leads with the progress-bar row; tap to resume.
+                if (tab == 1 && continueWatching.isNotEmpty()) {
+                    ContinueWatchingRow(
+                        continueWatching,
+                        onPlay = { w -> nav.navigate(Routes.player(w.mediaType, w.tmdbId, w.season ?: 1, w.episode ?: 1)) },
+                    )
+                }
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(110.dp),
                 contentPadding = PaddingValues(16.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.weight(1f),
             ) {
                 items(filtered, key = { it.key }) { item ->
                     Column(
@@ -165,6 +179,7 @@ fun WatchlistScreen(nav: NavController, vm: WatchlistViewModel = viewModel()) {
                         )
                     }
                 }
+            }
             }
         }
     }
