@@ -59,20 +59,21 @@ class ProfileViewModel : ViewModel() {
     val favorites = MutableStateFlow<List<WatchItem>>(emptyList())
 
     init {
-        val uid = ServiceLocator.auth.uid
-        if (uid != null) {
-            viewModelScope.launch {
-                launch {
-                    ServiceLocator.watchlist.watchlist(uid).collect { items ->
-                        favorites.value = items.filter { it.rating >= 4.0 || it.status == WatchItem.STATUS_WATCHED }
-                        stats.value = ServiceLocator.watchlist.stats(items, myReviews.value.size)
-                    }
+        viewModelScope.launch {
+            // ensureUid mints a guest session when none exists, so stats work
+            // before sign-in too (the old plain-uid check silently showed all
+            // zeroes for guests).
+            val uid = ServiceLocator.auth.ensureUid() ?: return@launch
+            launch {
+                ServiceLocator.watchlist.watchlist(uid).collect { items ->
+                    favorites.value = items.filter { it.rating >= 4.0 || it.status == WatchItem.STATUS_WATCHED }
+                    stats.value = ServiceLocator.watchlist.stats(items, myReviews.value.size)
                 }
-                launch {
-                    ServiceLocator.social.myReviews(uid).collect { reviews ->
-                        myReviews.value = reviews
-                        stats.value = stats.value.copy(reviewCount = reviews.size)
-                    }
+            }
+            launch {
+                ServiceLocator.social.myReviews(uid).collect { reviews ->
+                    myReviews.value = reviews
+                    stats.value = stats.value.copy(reviewCount = reviews.size)
                 }
             }
         }

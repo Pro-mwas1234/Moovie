@@ -8,7 +8,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import android.util.Log
 import java.io.File
+import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
 
 /** Result of checking GitHub's latest release. */
@@ -40,6 +42,9 @@ private data class GhAsset(
     val size: Long = 0,
 )
 
+/** Outcome of an APK download: exactly one of [file] / [error] is set. */
+data class DownloadResult(val file: File? = null, val error: String? = null)
+
 /**
  * Checks the GitHub Releases feed for a newer APK and downloads it to app cache.
  *
@@ -51,8 +56,10 @@ class UpdateChecker {
 
     private val json = Gson()
     private val http = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(20, TimeUnit.SECONDS)
+        // Per-read timeout (not whole-body): a slow-but-alive 100MB download
+        // must not be killed just because one read takes a while.
+        .readTimeout(60, TimeUnit.SECONDS)
         .build()
 
     suspend fun latestUpdate(currentVersion: String): UpdateInfo? = withContext(Dispatchers.IO) {
@@ -86,43 +93,82 @@ class UpdateChecker {
         }.getOrNull()
     }
 
-    /** Streams the APK into cache and returns the file for the installer. */
-    suspend fun downloadApk(context: Context, url: String, onProgress: (Int) -> Unit): File? =
+    /**
+     * Streams the APK into cache and returns the file for the installer.
+     *
+     * Release APKs are big; a single dropped connection used to throw away the
+     * whole download and report "check your connection". Now it:
+     *  - writes to a .part file first, so the installer never sees a half APK,
+     *  - resumes with an HTTP Range request after each failure (up to 5 tries),
+     *  - verifies the byte count matches the server's before declaring success,
+     *  - returns the real error so the UI can say something specific.
+     */
+    suspend fun downloadApk(context: Context, url: String, onProgress: (Int) -> Unit): DownloadResult =
         withContext(Dispatchers.IO) {
-            runCatching {
-                val req = Request.Builder()
-                    .url(url)
-                    .header("User-Agent", "Moovie-App")
-                    .build()
-                http.newCall(req).execute().use { resp ->
-                    if (!resp.isSuccessful) error("HTTP ${resp.code}")
-                    val body = resp.body ?: error("Empty body")
-                    val total = body.contentLength()
-                    val dest = File(context.cacheDir, "moovie-update.apk")
-                dest.outputStream().use { out ->
-                    val buf = ByteArray(128 * 1024)
-                    var seen = 0L
-                    var lastPct = -1
-                    while (true) {
-                        val n = body.byteStream().read(buf)
-                        if (n < 0) break
-                        out.write(buf, 0, n)
-                        seen += n
-                        if (total > 0) {
-                            val pct = ((seen * 100) / total).toInt()
-                            if (pct != lastPct) {
-                                lastPct = pct
-                                onProgress(pct)
+            val dest = File(context.cacheDir, "moovie-update.apk")
+            val part = File(context.cacheDir, "moovie-update.apk.part")
+            if (dest.exists()) dest.delete() // stale file from an old attempt; always re-verify
+            var lastError: String? = null
+
+            repeat(MAX_ATTEMPTS) { attempt ->
+                try {
+                    val already = if (part.exists()) part.length() else 0L
+                    val req = Request.Builder()
+                        .url(url)
+                        .header("User-Agent", "Moovie-App")
+                        .apply { if (already > 0) header("Range", "bytes=$already-") }
+                        .build()
+                    http.newCall(req).execute().use { resp ->
+                        val resumeOk = already > 0 && resp.code == 206
+                        if (resp.code != 200 && !resumeOk) error("HTTP ${resp.code}")
+                        val body = resp.body ?: error("Empty response body")
+                        // Total expected size: Content-Range on resume, else Content-Length.
+                        val total = if (resumeOk) {
+                            resp.header("Content-Range")?.substringAfter('/')?.toLongOrNull()
+                                ?: (already + body.contentLength())
+                        } else {
+                            if (already > 0) part.delete() // server ignored Range; start fresh
+                            body.contentLength()
+                        }
+                        FileOutputStream(part, resumeOk).use { out ->
+                            val buf = ByteArray(256 * 1024)
+                            var seen = if (resumeOk) already else 0L
+                            var lastPct = if (total > 0) ((seen * 100) / total).toInt() else -1
+                            if (lastPct in 0..100) onProgress(lastPct)
+                            while (true) {
+                                val n = body.byteStream().read(buf)
+                                if (n < 0) break
+                                out.write(buf, 0, n)
+                                seen += n
+                                if (total > 0) {
+                                    val pct = ((seen * 100) / total).toInt().coerceIn(0, 100)
+                                    if (pct != lastPct) {
+                                        lastPct = pct
+                                        onProgress(pct)
+                                    }
+                                }
                             }
                         }
+                        if (total > 0 && part.length() < total) {
+                            error("Incomplete file (${part.length()}/$total bytes)")
+                        }
+                        if (part.length() <= 0L) error("Downloaded file is empty")
+                        if (dest.exists()) dest.delete()
+                        if (!part.renameTo(dest)) error("Couldn't save the downloaded file")
+                        return@withContext DownloadResult(file = dest)
                     }
+                } catch (e: Exception) {
+                    lastError = e.message ?: e.javaClass.simpleName
+                    Log.w(TAG, "APK download attempt ${attempt + 1}/$MAX_ATTEMPTS failed: $lastError")
                 }
-                dest
+                kotlinx.coroutines.delay(1500L * (attempt + 1)) // back off before retrying
             }
-        }.getOrNull()
-    }
+            DownloadResult(error = lastError ?: "Unknown error")
+        }
 
     companion object {
+        private const val TAG = "UpdateChecker"
+        private const val MAX_ATTEMPTS = 5
 
         /**
          * Compares "vMAJOR.MINOR.PATCH" tags. Falls back to plain inequality when

@@ -41,6 +41,23 @@ class MovieRepository(private val api: TmdbApi) {
 
     private var genresCache: List<TmdbGenre>? = null
 
+    /**
+     * ISO-3166 country code ("US", "KE", …) sent to TMDB's region-aware
+     * endpoints so "new releases"/"coming soon" match the user's country.
+     * Set from prefs at startup and whenever the user changes it in Settings.
+     */
+    @Volatile
+    var region: String = "US"
+        private set
+
+    /** Updates the region and drops cached region-aware rows so they reload. */
+    fun setRegion(code: String) {
+        val next = code.trim().uppercase().ifBlank { "US" }
+        if (next == region) return
+        region = next
+        listOf("now_playing", "popular", "upcoming").forEach { cache.remove(it) }
+    }
+
     private data class CacheEntry(val at: Long, val value: Any?)
 
     private suspend fun <T> cached(key: String, loader: suspend () -> T): T {
@@ -107,15 +124,15 @@ class MovieRepository(private val api: TmdbApi) {
     }
 
     suspend fun newReleases(): List<Title> = cached("now_playing") {
-        api.nowPlaying().results.map { movieToTitle(it) }
+        api.nowPlaying(region = region).results.map { movieToTitle(it) }
     }
 
     suspend fun popular(): List<Title> = cached("popular") {
-        api.popularMovies().results.map { movieToTitle(it) }
+        api.popularMovies(region = region).results.map { movieToTitle(it) }
     }
 
     suspend fun upcoming(): List<Title> = cached("upcoming") {
-        api.upcoming().results.map { movieToTitle(it) }
+        api.upcoming(region = region).results.map { movieToTitle(it) }
     }
 
     suspend fun topRatedMovies(): List<Title> = cached("top_rated_movies") {

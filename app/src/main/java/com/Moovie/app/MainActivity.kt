@@ -19,7 +19,7 @@ class MainActivity : ComponentActivity() {
             val prefs = ServiceLocator.prefs.prefs.collectAsState(initial = null).value
             when (prefs) {
                 null -> MoovieTheme { SplashScreen() }
-                else -> MoovieTheme(darkTheme = prefs.darkMode) {
+                else -> MoovieTheme(themeMode = prefs.themeMode, accent = prefs.accent) {
                     if (!prefs.onboarded) {
                         OnboardingFlow()
                     } else {

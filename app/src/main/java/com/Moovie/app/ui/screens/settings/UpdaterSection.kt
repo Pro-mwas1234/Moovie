@@ -24,7 +24,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.Moovie.app.BuildConfig
 import com.Moovie.app.ServiceLocator
 import com.Moovie.app.data.update.ApkInstaller
@@ -35,6 +34,13 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 enum class UpdateState { IDLE, CHECKING, UP_TO_DATE, AVAILABLE, DOWNLOADING, READY }
+
+/**
+ * One shared instance for the Settings section AND the popup dialog, so a
+ * download started from the dialog shows its progress in Settings too (and
+ * vice versa) instead of two VMs racing on the same APK file.
+ */
+val sharedUpdateViewModel = UpdateViewModel()
 
 class UpdateViewModel : ViewModel() {
     val state = MutableStateFlow(UpdateState.IDLE)
@@ -64,21 +70,33 @@ class UpdateViewModel : ViewModel() {
             state.value = UpdateState.DOWNLOADING
             progress.value = 0
             message.value = null
-            val file = checker.downloadApk(context, target.apkUrl) { pct -> progress.value = pct }
+            val result = checker.downloadApk(context, target.apkUrl) { pct -> progress.value = pct }
+            val file = result.file
             if (file != null && file.exists() && file.length() > 0L) {
                 apkFile = file
                 state.value = UpdateState.READY
-                ApkInstaller.install(context, file)
+                if (!ApkInstaller.install(context, file)) {
+                    // Download finished fine; the launcher just didn't come up
+                    // (usually missing "install unknown apps" consent).
+                    message.value = "Download complete — tap Install now to continue."
+                }
             } else {
+                // The download now retries + resumes internally; if it still
+                // failed, tell the user exactly what went wrong.
                 state.value = UpdateState.AVAILABLE
-                message.value = "Download failed — check your connection and try again."
+                message.value = "Download failed: ${result.error ?: "unknown error"}. Tap Download & install to retry."
             }
         }
     }
 
     /** Re-launches the installer if the user dismissed the first prompt. */
     fun installNow(context: Context) {
-        apkFile?.let { ApkInstaller.install(context, it) }
+        val f = apkFile ?: return
+        if (ApkInstaller.install(context, f)) {
+            message.value = null
+        } else {
+            message.value = "Couldn't open the installer. Check Moovie has 'Install unknown apps' permission, then try again."
+        }
     }
 }
 
@@ -87,7 +105,7 @@ class UpdateViewModel : ViewModel() {
  * release. Reuses UpdateViewModel so "Download & install" shares one flow.
  */
 @Composable
-fun UpdateAvailableDialog(vm: UpdateViewModel = viewModel()) {
+fun UpdateAvailableDialog(vm: UpdateViewModel = sharedUpdateViewModel) {
     val poller = ServiceLocator.updatePoller
     val pending by poller.update.collectAsState()
     val dismissed by poller.dismissedTag.collectAsState()
@@ -125,7 +143,7 @@ fun UpdateAvailableDialog(vm: UpdateViewModel = viewModel()) {
 }
 
 @Composable
-fun UpdaterSection(vm: UpdateViewModel = viewModel()) {
+fun UpdaterSection(vm: UpdateViewModel = sharedUpdateViewModel) {
     val state by vm.state.collectAsState()
     val update by vm.update.collectAsState()
     val progress by vm.progress.collectAsState()

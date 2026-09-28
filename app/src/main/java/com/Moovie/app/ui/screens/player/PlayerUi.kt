@@ -61,6 +61,13 @@ fun PlayerScreen(nav: NavController, vm: PlayerViewModel) {
 
     val url = embedUrl(mediaType, vm.idForUi, currentSeason, currentEpisode)
 
+    // Watch tracking: mark "Watching" on entry, "Watched" on exit, so the
+    // profile stats reflect what the user actually plays.
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        vm.startWatching()
+        onDispose { vm.finishWatching() }
+    }
+
     Column(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black)) {
         // Top bar
         Row(

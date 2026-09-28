@@ -51,6 +51,7 @@ import androidx.navigation.NavController
 import com.Moovie.app.ServiceLocator
 import com.Moovie.app.data.model.DownloadItem
 import com.Moovie.app.data.model.TmdbEpisode
+import com.Moovie.app.data.model.WatchItem
 import com.Moovie.app.data.remote.OmniSaveClient
 import com.Moovie.app.data.remote.TmdbClient
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -178,5 +179,53 @@ class PlayerViewModel(
         episodes.value = runCatching {
             ServiceLocator.tmdb.tvSeason(tmdbId, season).episodes
         }.getOrDefault(emptyList())
+    }
+
+    /**
+     * Watch tracking: entering the player marks this title WATCHING; leaving it
+     * marks it WATCHED. This is what feeds the profile stats (Movies Watched,
+     * Hours Watched, favorite genre) — without it stats only counted titles the
+     * user manually tagged on the detail screen.
+     *
+     * Uses appScope (not viewModelScope) because finishWatching() fires while
+     * this VM is being torn down.
+     */
+    fun startWatching() {
+        ServiceLocator.appScope.launch { trackWatching(watched = false) }
+    }
+
+    fun finishWatching() {
+        ServiceLocator.appScope.launch { trackWatching(watched = true) }
+    }
+
+    private suspend fun trackWatching(watched: Boolean) {
+        try {
+            val uid = ServiceLocator.auth.ensureUid() ?: return
+            val key = "$mediaType-$tmdbId"
+            val existing = ServiceLocator.watchlist.findItem(uid, key)
+            val item = existing ?: run {
+                // Not on the watchlist yet: build the entry from TMDB metadata.
+                val d = if (mediaType == "tv") ServiceLocator.movies.tvDetail(tmdbId)
+                else ServiceLocator.movies.movieDetail(tmdbId)
+                WatchItem(
+                    key = key,
+                    tmdbId = tmdbId,
+                    mediaType = mediaType,
+                    titleName = d.title.name,
+                    posterPath = d.title.posterPath,
+                    backdropPath = d.title.backdropPath,
+                    year = d.title.year,
+                    rating = d.title.rating,
+                    genreIds = d.genres.map { it.id },
+                    runtimeMinutes = d.runtimeMinutes,
+                    status = WatchItem.STATUS_WANT,
+                )
+            }
+            val target = if (watched) WatchItem.STATUS_WATCHED else WatchItem.STATUS_WATCHING
+            if (item.status == target) return
+            ServiceLocator.watchlist.addOrUpdate(uid, item.copy(status = target))
+        } catch (e: Exception) {
+            android.util.Log.w("PlayerViewModel", "Watch tracking failed: ${e.message}")
+        }
     }
 }
