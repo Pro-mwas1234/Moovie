@@ -51,7 +51,6 @@ import androidx.navigation.NavController
 import com.Moovie.app.ServiceLocator
 import com.Moovie.app.data.model.DownloadItem
 import com.Moovie.app.data.model.TmdbEpisode
-import com.Moovie.app.data.model.WatchItem
 import com.Moovie.app.data.remote.OmniSaveClient
 import com.Moovie.app.data.remote.TmdbClient
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -182,48 +181,45 @@ class PlayerViewModel(
     }
 
     /**
-     * Watch tracking: entering the player marks this title WATCHING; leaving it
-     * marks it WATCHED. This is what feeds the profile stats (Movies Watched,
-     * Hours Watched, favorite genre) — without it stats only counted titles the
-     * user manually tagged on the detail screen.
+     * Watch tracking: entering the player marks the title WATCHING (so it shows
+     * under Continue Watching); leaving it saves the playback position — for TV
+     * also the season/episode — so Home can resume it and draw a progress bar.
+     * Reaching ~90% of the runtime auto-marks it Watched.
      *
      * Uses appScope (not viewModelScope) because finishWatching() fires while
      * this VM is being torn down.
      */
+    private var lastPositionSeconds = 0L
+
+    /** Called by the native player while it plays; the embed has no position API. */
+    fun reportPosition(seconds: Long) {
+        if (seconds > lastPositionSeconds) lastPositionSeconds = seconds
+    }
+
     fun startWatching() {
-        ServiceLocator.appScope.launch { trackWatching(watched = false) }
+        ServiceLocator.appScope.launch { trackWatching(closing = false) }
     }
 
     fun finishWatching() {
-        ServiceLocator.appScope.launch { trackWatching(watched = true) }
+        ServiceLocator.appScope.launch { trackWatching(closing = true) }
     }
 
-    private suspend fun trackWatching(watched: Boolean) {
+    private suspend fun trackWatching(closing: Boolean) {
         try {
             val uid = ServiceLocator.auth.ensureUid() ?: return
-            val key = "$mediaType-$tmdbId"
-            val existing = ServiceLocator.watchlist.findItem(uid, key)
-            val item = existing ?: run {
-                // Not on the watchlist yet: build the entry from TMDB metadata.
-                val d = if (mediaType == "tv") ServiceLocator.movies.tvDetail(tmdbId)
-                else ServiceLocator.movies.movieDetail(tmdbId)
-                WatchItem(
-                    key = key,
-                    tmdbId = tmdbId,
-                    mediaType = mediaType,
-                    titleName = d.title.name,
-                    posterPath = d.title.posterPath,
-                    backdropPath = d.title.backdropPath,
-                    year = d.title.year,
-                    rating = d.title.rating,
-                    genreIds = d.genres.map { it.id },
-                    runtimeMinutes = d.runtimeMinutes,
-                    status = WatchItem.STATUS_WANT,
-                )
-            }
-            val target = if (watched) WatchItem.STATUS_WATCHED else WatchItem.STATUS_WATCHING
-            if (item.status == target) return
-            ServiceLocator.watchlist.addOrUpdate(uid, item.copy(status = target))
+            val runtime = runCatching {
+                if (mediaType == "tv") ServiceLocator.movies.tvDetail(tmdbId).runtimeMinutes
+                else ServiceLocator.movies.movieDetail(tmdbId).runtimeMinutes
+            }.getOrNull()
+            val posMin = if (closing && lastPositionSeconds > 0) (lastPositionSeconds / 60).toInt() else null
+            ServiceLocator.watchlist.updateProgress(
+                uid = uid,
+                key = "$mediaType-$tmdbId",
+                progressMinutes = posMin,
+                season = if (mediaType == "tv") currentSeason.value else null,
+                episode = if (mediaType == "tv") currentEpisode.value else null,
+                runtimeMinutes = runtime,
+            )
         } catch (e: Exception) {
             android.util.Log.w("PlayerViewModel", "Watch tracking failed: ${e.message}")
         }

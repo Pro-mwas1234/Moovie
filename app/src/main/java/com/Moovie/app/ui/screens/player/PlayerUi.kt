@@ -128,6 +128,7 @@ fun PlayerScreen(nav: NavController, vm: PlayerViewModel) {
                 ExoPlayerScreen(
                     url = directStream!!,
                     modifier = Modifier.fillMaxSize(),
+                    onPosition = { vm.reportPosition(it) },
                 )
                 if (!isLocalFile) {
                     Text(
@@ -298,7 +299,7 @@ private tailrec fun android.content.Context.findActivity(): android.app.Activity
  */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
-private fun ExoPlayerScreen(url: String, modifier: Modifier = Modifier) {
+private fun ExoPlayerScreen(url: String, modifier: Modifier = Modifier, onPosition: (Long) -> Unit = {}) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
 
@@ -336,6 +337,17 @@ private fun ExoPlayerScreen(url: String, modifier: Modifier = Modifier) {
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(obs)
             player.release()
+        }
+    }
+
+    // Periodically report the playback position so Continue Watching can
+    // resume here and draw a progress bar on Home.
+    androidx.compose.runtime.LaunchedEffect(player) {
+        while (true) {
+            if (player.playWhenReady && player.playbackState != androidx.media3.common.Player.STATE_ENDED) {
+                onPosition(player.currentPosition / 1000)
+            }
+            kotlinx.coroutines.delay(5_000)
         }
     }
 

@@ -73,6 +73,59 @@ class WatchlistRepository {
         c.document(docId).update("progressMinutes", progressMinutes).await()
     }
 
+    /**
+     * Watch-tracking write used by the player: merges playback position (and
+     * the TV season/episode) into the watchlist entry, creating it from TMDB
+     * metadata when the title isn't on the watchlist yet. Status becomes
+     * WATCHING unless the item is already WATCHED or the user is near the end
+     * (>=90%), in which case the existing status is kept.
+     */
+    suspend fun updateProgress(
+        uid: String,
+        key: String,
+        progressMinutes: Int?,
+        season: Int? = null,
+        episode: Int? = null,
+        runtimeMinutes: Int? = null,
+    ): Result<Unit> = runCatching {
+        val existing = findItem(uid, key)
+        val item = existing ?: createItemFromTmdb(uid, key)
+        val merged = item.copy(
+            progressMinutes = progressMinutes ?: item.progressMinutes,
+            season = season ?: item.season,
+            episode = episode ?: item.episode,
+            runtimeMinutes = runtimeMinutes ?: item.runtimeMinutes,
+        )
+        val runtime = merged.runtimeMinutes ?: 110
+        val nearEnd = progressMinutes != null && progressMinutes >= runtime * 9 / 10
+        val status = when {
+            merged.status == WatchItem.STATUS_WATCHED -> WatchItem.STATUS_WATCHED
+            nearEnd -> WatchItem.STATUS_WATCHED
+            else -> WatchItem.STATUS_WATCHING
+        }
+        addOrUpdate(uid, merged.copy(status = status))
+    }
+
+    /** Builds a bare WatchItem from TMDB so tracked titles appear with poster/name. */
+    private suspend fun createItemFromTmdb(uid: String, key: String): WatchItem {
+        val mediaType = if (key.startsWith("tv-")) "tv" else "movie"
+        val id = key.removePrefix("tv-").removePrefix("movie-").toIntOrNull() ?: 0
+        val d = ServiceLocator.movies.detail(id, mediaType)
+        return WatchItem(
+            key = key,
+            tmdbId = id,
+            mediaType = mediaType,
+            titleName = d.title.name,
+            posterPath = d.title.posterPath,
+            backdropPath = d.title.backdropPath,
+            year = d.title.year,
+            rating = d.title.rating,
+            genreIds = d.genres.map { it.id },
+            runtimeMinutes = d.runtimeMinutes,
+            status = WatchItem.STATUS_WANT,
+        )
+    }
+
     suspend fun remove(uid: String, docId: String): Result<Unit> = runCatching {
         val c = col(uid) ?: run {
             local.watchFlow(uid).value = local.watchFlow(uid).value.filterNot { it.key == docId }

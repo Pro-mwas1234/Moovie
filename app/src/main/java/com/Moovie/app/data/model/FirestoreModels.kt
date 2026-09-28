@@ -15,6 +15,9 @@ data class WatchItem(
     val runtimeMinutes: Int? = null,
     val status: String = STATUS_WANT,
     val progressMinutes: Int? = null,
+    /** Last-played episode for TV, used by Continue Watching to resume. */
+    val season: Int? = null,
+    val episode: Int? = null,
     val addedAt: Timestamp? = null,
     val updatedAt: Timestamp? = null,
 ) {
@@ -31,6 +34,8 @@ data class WatchItem(
         "runtimeMinutes" to runtimeMinutes,
         "status" to status,
         "progressMinutes" to progressMinutes,
+        "season" to season,
+        "episode" to episode,
         "addedAt" to (addedAt ?: Timestamp.now()),
         "updatedAt" to Timestamp.now(),
     )
@@ -53,6 +58,8 @@ data class WatchItem(
             runtimeMinutes = (m["runtimeMinutes"] as? Long)?.toInt(),
             status = m["status"] as? String ?: STATUS_WANT,
             progressMinutes = (m["progressMinutes"] as? Long)?.toInt(),
+            season = (m["season"] as? Long)?.toInt(),
+            episode = (m["episode"] as? Long)?.toInt(),
             addedAt = m["addedAt"] as? Timestamp,
             updatedAt = m["updatedAt"] as? Timestamp,
         )
