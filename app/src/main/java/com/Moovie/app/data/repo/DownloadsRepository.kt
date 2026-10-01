@@ -7,36 +7,47 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Saved-for-offline list. Uses local in-memory storage only.
- * Firestore dependency removed for simplicity.
+ * Saved-for-offline list. Backed by [LocalDataStore], which keeps the list in
+ * memory during the session **and** persists it to disk per user — so
+ * downloads survive app restarts and updates. Every mutation re-persists.
  */
 class DownloadsRepository {
 
-    private val local = ServiceLocator.local
+    private val local get() = ServiceLocator.local
+
+    private fun downloadFiles() = ServiceLocator.downloadFiles
 
     fun downloads(uid: String): StateFlow<List<DownloadItem>> = local.downloadFlow(uid)
 
     suspend fun addOrUpdate(uid: String, item: DownloadItem) {
         val current = local.downloadFlow(uid).value.toMutableList()
         current.removeAll { it.key == item.key }
-        local.downloadFlow(uid).value = listOf(item) + current
+        val next = listOf(item) + current
+        local.downloadFlow(uid).value = next
+        local.persistDownloads(uid, next)
     }
 
     suspend fun setStatus(uid: String, docId: String, status: String) {
-        local.downloadFlow(uid).value = local.downloadFlow(uid).value.map {
+        val next = local.downloadFlow(uid).value.map {
             if (it.key == docId) it.copy(status = status) else it
         }
+        local.downloadFlow(uid).value = next
+        local.persistDownloads(uid, next)
     }
 
     suspend fun setProgress(uid: String, docId: String, percent: Int) {
         val safe = percent.coerceIn(0, 100)
-        local.downloadFlow(uid).value = local.downloadFlow(uid).value.map {
+        val next = local.downloadFlow(uid).value.map {
             if (it.key == docId) it.copy(progressPercent = safe) else it
         }
+        local.downloadFlow(uid).value = next
+        local.persistDownloads(uid, next)
     }
 
     suspend fun remove(uid: String, docId: String) {
-        local.downloadFlow(uid).value = local.downloadFlow(uid).value.filterNot { it.key == docId }
+        val next = local.downloadFlow(uid).value.filterNot { it.key == docId }
+        local.downloadFlow(uid).value = next
+        local.persistDownloads(uid, next)
     }
 
     suspend fun findItem(uid: String, key: String): DownloadItem? =

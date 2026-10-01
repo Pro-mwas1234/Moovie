@@ -87,10 +87,17 @@ class DownloadManager(private val context: Context) {
                     else update(uid, key, backend = false) { it.copy(progressPercent = pct) }
                 }
 
-                // 3. Mark ready with the local file path.
+                // 3. Publish into the shared Movies/Moovie gallery (MediaStore)
+                //    so the file shows up in gallery apps and survives updates,
+                //    then mark ready with the playback path (content:// URI on
+                //    modern Android, file path on older devices).
+                val playbackPath = ServiceLocator.downloadFiles.publishToGallery(
+                    dest, ServiceLocator.downloadFiles.displayNameFor(item),
+                )
                 update(uid, key) {
-                    it.copy(status = DownloadItem.STATUS_READY, progressPercent = 100, localPath = dest.absolutePath)
+                    it.copy(status = DownloadItem.STATUS_READY, progressPercent = 100, localPath = playbackPath)
                 }
+                if (playbackPath != dest.absolutePath) dest.delete()
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) {
                     // Cancelled by the user: clean up partial file, back to queued.
@@ -111,9 +118,9 @@ class DownloadManager(private val context: Context) {
         jobs.remove(key)?.cancel()
     }
 
-    /** Deletes the local file (kept in list, back to queued). */
+    /** Deletes the local file (MediaStore row or file; kept in list, back to queued). */
     fun deleteLocal(uid: String, item: DownloadItem) {
-        item.localPath?.let { File(it).delete() }
+        ServiceLocator.downloadFiles.delete(item.localPath)
         ServiceLocator.appScope.launch {
             ServiceLocator.downloads.addOrUpdate(
                 uid, item.copy(status = DownloadItem.STATUS_QUEUED, progressPercent = 0, localPath = null)

@@ -56,7 +56,6 @@ import com.Moovie.app.data.remote.TmdbClient
 import com.Moovie.app.ui.navigation.Routes
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
-import java.io.File
 
 class DownloadsViewModel : ViewModel() {
     val items = MutableStateFlow<List<DownloadItem>>(emptyList())
@@ -71,7 +70,8 @@ class DownloadsViewModel : ViewModel() {
     }
 
     fun remove(item: DownloadItem) {
-        if (item.localPath != null) File(item.localPath).delete()
+        // Also delete the video file itself (MediaStore row or private file).
+        ServiceLocator.downloadFiles.delete(item.localPath)
         viewModelScope.launch {
             val uid = ServiceLocator.auth.ensureUid() ?: return@launch
             ServiceLocator.downloads.remove(uid, item.key)
@@ -80,7 +80,7 @@ class DownloadsViewModel : ViewModel() {
 
     /** Starts (or resumes) the real file download for a queued/failed item. */
     fun download(item: DownloadItem) {
-        val fresh = if (item.localPath != null) {
+        val fresh = if (item.localPath != null && ServiceLocator.downloadFiles.exists(item.localPath)) {
             item.copy(status = DownloadItem.STATUS_READY, progressPercent = 100)
         } else item
         // enqueue self-heals auth (ensureUid) instead of silently no-oping.

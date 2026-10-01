@@ -6,6 +6,7 @@ import com.Moovie.app.data.local.PrefsRepository
 import com.Moovie.app.data.remote.TmdbApi
 import com.Moovie.app.data.remote.TmdbClient
 import com.Moovie.app.data.repo.AuthRepository
+import com.Moovie.app.data.repo.DownloadFiles
 import com.Moovie.app.data.repo.DownloadManager
 import com.Moovie.app.data.repo.DownloadsRepository
 import com.Moovie.app.data.repo.LocalDataStore
@@ -47,12 +48,19 @@ object ServiceLocator {
     lateinit var downloadManager: DownloadManager
         private set
 
+    /** Gallery publishing + file cleanup for finished downloads. */
+    lateinit var downloadFiles: DownloadFiles
+        private set
+
     /** Background update checker (launch + every 5h). */
     lateinit var updatePoller: com.Moovie.app.data.update.UpdatePoller
         private set
 
     fun init(context: Context) {
-        prefs = PrefsRepository(context)
+        val app = context.applicationContext
+        local.attach(app)
+        downloadFiles = DownloadFiles(app)
+        prefs = PrefsRepository(app)
         tmdb = TmdbClient.create()
         movies = MovieRepository(tmdb)
         auth = AuthRepository()
@@ -61,7 +69,7 @@ object ServiceLocator {
         social = SocialRepository()
         watchParty = WatchPartyRepository()
         recommend = RecommendEngine(movies)
-        downloadManager = DownloadManager(context.applicationContext)
+        downloadManager = DownloadManager(app)
         updatePoller = com.Moovie.app.data.update.UpdatePoller(appScope)
         updatePoller.start()
     }

@@ -1,0 +1,48 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.9/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :app:checkDebugAarMetadata
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:processDebugGoogleServices UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :app:compileDebugKotlin
+e: file:///C:/Users/augus/OneDrive/Desktop/project/streaming/Moovie/app/src/main/java/com/Moovie/app/ServiceLocator.kt:51:33 Unresolved reference 'DownloadFiles'.
+e: file:///C:/Users/augus/OneDrive/Desktop/project/streaming/Moovie/app/src/main/java/com/Moovie/app/ServiceLocator.kt:61:25 Unresolved reference 'DownloadFiles'.
+e: file:///C:/Users/augus/OneDrive/Desktop/project/streaming/Moovie/app/src/main/java/com/Moovie/app/data/repo/DownloadManager.kt:94:65 Unresolved reference 'publishToGallery'.
+e: file:///C:/Users/augus/OneDrive/Desktop/project/streaming/Moovie/app/src/main/java/com/Moovie/app/data/repo/DownloadManager.kt:95:56 Unresolved reference 'displayNameFor'.
+e: file:///C:/Users/augus/OneDrive/Desktop/project/streaming/Moovie/app/src/main/java/com/Moovie/app/data/repo/DownloadManager.kt:123:38 Unresolved reference 'delete'.
+e: file:///C:/Users/augus/OneDrive/Desktop/project/streaming/Moovie/app/src/main/java/com/Moovie/app/ui/screens/downloads/DownloadsScreen.kt:74:38 Unresolved reference 'delete'.
+e: file:///C:/Users/augus/OneDrive/Desktop/project/streaming/Moovie/app/src/main/java/com/Moovie/app/ui/screens/downloads/DownloadsScreen.kt:83:80 Unresolved reference 'exists'.
+e: file:///C:/Users/augus/OneDrive/Desktop/project/streaming/Moovie/app/src/main/java/com/Moovie/app/ui/screens/player/PlayerScreen.kt:117:74 Unresolved reference 'exists'.
+
+> Task :app:compileDebugKotlin FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileDebugKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 23m 51s
+16 actionable tasks: 1 executed, 15 up-to-date

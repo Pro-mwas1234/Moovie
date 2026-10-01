@@ -114,7 +114,7 @@ class PlayerViewModel(
                 val uid = ServiceLocator.auth.ensureUid()
                 if (uid != null) ServiceLocator.downloads.findItem(uid, downloadKey()) else null
             }.getOrNull()
-            if (local?.localPath != null && java.io.File(local.localPath!!).exists()) {
+            if (local?.localPath != null && ServiceLocator.downloadFiles.exists(local.localPath)) {
                 directStream.value = local.localPath
             } else {
                 titleName.value.takeIf { it.isNotBlank() }?.let { name ->
