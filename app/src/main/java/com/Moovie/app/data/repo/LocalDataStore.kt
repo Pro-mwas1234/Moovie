@@ -36,6 +36,10 @@ class LocalDataStore {
     /** Set by [attach] before init() completes; persistence no-ops until then. */
     private var appContext: Context? = null
 
+    /** Public accessor for export/write paths so repo classes can write exports. */
+    val filesDir: File?
+        get() = appContext?.let { File(it.filesDir, "exports").apply { mkdirs() } }
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val persistMutex = Mutex()
 
@@ -91,6 +95,25 @@ class LocalDataStore {
         rooms.getOrPut(code) { MutableStateFlow(PartyRoomState()) }
 
     suspend fun setProfileName(name: String) = mutex.withLock { profileName = name }
+
+    /** Clears all locally cached collections and persisted downloads for every uid.
+     * Used by the account-deletion flow and by dev reset, not by normal UI.
+     */
+    suspend fun clearAll() {
+        mutex.withLock {
+            watchItems.clear()
+            downloads.clear()
+            reviews.clear()
+            allReviews.value = emptyList()
+            follows.value = emptySet()
+            chat.clear()
+            rooms.clear()
+            notifications.value = emptyList()
+        }
+        appContext?.let { ctx ->
+            scope.launch { persistMutex.withLock { runCatching { File(ctx.filesDir, "downloads").deleteRecursively() } } }
+        }
+    }
 
     suspend fun addNotification(item: NotificationItem) {
         notifications.value = listOf(item) + notifications.value

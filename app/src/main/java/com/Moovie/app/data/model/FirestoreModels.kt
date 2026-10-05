@@ -238,6 +238,8 @@ data class PartyRoomState(
         const val TYPE_GENERIC = "generic"
         const val TYPE_NEW_FOLLOWER = "new_follower"
         const val TYPE_NEW_REVIEW_FROM_FOLLOWEE = "review_followee"
+        const val TYPE_RESUME_REMINDER = "resume_reminder"
+        const val TYPE_DISCOVERY = "discovery"
 
         fun fromMap(id: String, m: Map<String, Any?>): NotificationItem = NotificationItem(
             id = id,

@@ -140,6 +140,43 @@ class SocialRepository {
         }
     }
 
+    suspend fun sendNotification(item: NotificationItem): Result<Unit> = runCatching {
+        val uid = item.uid
+        val c = notifsCol(uid) ?: return Result.success(Unit)
+        c.add(
+            mapOf(
+                "type" to item.type,
+                "uid" to item.uid,
+                "key" to item.key,
+                "text" to item.text,
+                "read" to item.read,
+                "createdAt" to com.google.firebase.Timestamp.now(),
+            )
+        ).await()
+    }
+
+    suspend fun sendResumeReminder(uid: String, watchItemKey: String, titleName: String): Result<Unit> = runCatching {
+        sendNotification(
+            NotificationItem(
+                type = NotificationItem.TYPE_RESUME_REMINDER,
+                uid = uid,
+                key = watchItemKey,
+                text = "Still got $$titleName? Pick up where you left off.",
+            )
+        )
+    }
+
+    suspend fun sendDiscoveryNotification(uid: String, text: String): Result<Unit> = runCatching {
+        sendNotification(
+            NotificationItem(
+                type = NotificationItem.TYPE_DISCOVERY,
+                uid = uid,
+                text = text,
+            )
+        )
+    }
+
+
     // ---------- Profiles ----------
 
     suspend fun profile(uid: String): UserProfile? {
@@ -194,5 +231,20 @@ class SocialRepository {
         val batch = FirestoreGate.db()?.batch()
         unread.documents.forEach { batch?.update(it.reference, "read", true) }
         batch?.commit()?.await()
+    }
+
+    suspend fun markAllNotificationsRead(): Result<Unit> {
+        val uid = ServiceLocator.auth.uid ?: return Result.success(Unit)
+        return markNotificationsRead(uid)
+    }
+
+    suspend fun deleteAllMyReviews(): Result<Unit> = runCatching {
+        val uid = ServiceLocator.auth.uid ?: return Result.success(Unit)
+        val c = reviewsCol() ?: return Result.success(Unit)
+        val my = try { c.whereEqualTo("uid", uid).get().await() } catch (_: Exception) { return Result.success(Unit) }
+        val batch = FirestoreGate.db()?.batch()
+        my.documents.forEach { batch?.delete(it.reference) }
+        batch?.commit()?.await()
+        local.allReviews.value = local.allReviews.value.filter { it.uid != uid }
     }
 }

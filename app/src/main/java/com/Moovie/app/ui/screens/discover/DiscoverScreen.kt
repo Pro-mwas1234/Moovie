@@ -21,6 +21,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -124,7 +125,38 @@ class DiscoverViewModel : ViewModel() {
             try {
                 val pick = ServiceLocator.movies.surpriseMe()
                 loading.value = false
+                sendDiscoveryNotification(pick)
                 nav.navigate(Routes.detail(pick.mediaType, pick.id))
+            } catch (e: Exception) {
+                error.value = e.message
+                loading.value = false
+            }
+        }
+    }
+
+    private suspend fun sendDiscoveryNotification(pick: Title) {
+        val uid = ServiceLocator.auth.uid ?: return
+        runCatching {
+            ServiceLocator.social.sendDiscoveryNotification(
+                uid,
+                "Picked \$pick.name for you — check it out when you're ready."
+            )
+        }
+    }
+
+    fun sendDiscoveryNudge(nav: NavController) {
+        viewModelScope.launch {
+            loading.value = true
+            error.value = null
+            try {
+                val picks = (1..3).mapNotNull {
+                    runCatching { ServiceLocator.movies.surpriseMe() }.getOrNull()
+                }.distinctBy { it.id }.take(3)
+                loading.value = false
+                if (picks.isNotEmpty()) {
+                    sendDiscoveryNotification(picks.first())
+                    nav.navigate(Routes.detail(picks.first().mediaType, picks.first().id))
+                }
             } catch (e: Exception) {
                 error.value = e.message
                 loading.value = false
@@ -196,6 +228,13 @@ fun DiscoverScreen(nav: NavController, vm: DiscoverViewModel = viewModel()) {
                 Button(onClick = { vm.surprise(nav) }, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Filled.Casino, null)
                     Text("  Surprise Me")
+                }
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { vm.sendDiscoveryNudge(nav) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("  Nudge me with 3 hidden picks")
                 }
                 Spacer(Modifier.height(12.dp))
                 Text(header, style = MaterialTheme.typography.titleMedium)

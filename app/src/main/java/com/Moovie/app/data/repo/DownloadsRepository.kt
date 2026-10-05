@@ -1,10 +1,12 @@
 package com.Moovie.app.data.repo
 
+import com.google.firebase.firestore.firestore
 import com.Moovie.app.ServiceLocator
 import com.Moovie.app.data.model.DownloadItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.tasks.await
 
 /**
  * Saved-for-offline list. Backed by [LocalDataStore], which keeps the list in
@@ -42,6 +44,24 @@ class DownloadsRepository {
         }
         local.downloadFlow(uid).value = next
         local.persistDownloads(uid, next)
+    }
+
+    private fun col(uid: String) =
+        com.Moovie.app.data.repo.FirestoreGate.db()?.collection("users/$uid/downloads")
+
+    suspend fun removeWhere(predicate: (DownloadItem) -> Boolean) {
+        val uid = ServiceLocator.auth.uid ?: return
+        val c = col(uid) ?: run {
+            local.downloadFlow(uid).value = local.downloadFlow(uid).value.filterNot { predicate(it) }
+            return
+        }
+        val snap = runCatching { c.get().await() }.getOrNull() ?: return
+        val batch = com.Moovie.app.data.repo.FirestoreGate.db()?.batch()
+        snap.documents.forEach { doc ->
+            val item = DownloadItem.fromMap(doc.id, doc.data ?: emptyMap())
+            if (predicate(item)) batch?.delete(doc.reference)
+        }
+        batch?.commit()?.await()
     }
 
     suspend fun remove(uid: String, docId: String) {

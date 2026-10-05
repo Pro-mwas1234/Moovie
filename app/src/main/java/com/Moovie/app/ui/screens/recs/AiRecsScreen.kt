@@ -121,8 +121,23 @@ fun AiRecsScreen(nav: NavController, vm: AiRecsViewModel = viewModel()) {
                             items(turn.reply.suggestions, key = { it.rawName }) { s ->
                                 val title = s.title
                                 if (title != null) {
-                                    PosterCard(title) {
-                                        nav.navigate(Routes.detail(title.mediaType, title.id))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        PosterCard(title) {
+                                            nav.navigate(Routes.detail(title.mediaType, title.id))
+                                        }
+                                        Spacer(Modifier.padding(horizontal = 6.dp))
+                                        IconButton(
+                                            onClick = { ServiceLocator.recommend.recordFeedback(title.id, title.mediaType, false) },
+                                            modifier = Modifier.padding(6.dp),
+                                        ) {
+                                            Text("−", color = MaterialTheme.colorScheme.error)
+                                        }
+                                        IconButton(
+                                            onClick = { ServiceLocator.recommend.recordFeedback(title.id, title.mediaType, true) },
+                                            modifier = Modifier.padding(6.dp),
+                                        ) {
+                                            Text("+", color = MaterialTheme.colorScheme.primary)
+                                        }
                                     }
                                 } else {
                                     Text(s.rawName, color = MaterialTheme.colorScheme.onSurfaceVariant)

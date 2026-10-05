@@ -118,6 +118,7 @@ fun ContinueWatchingRow(
     modifier: Modifier = Modifier,
     onPlay: (WatchItem) -> Unit,
     onRemove: (WatchItem) -> Unit = {},
+    onMarkWatched: (WatchItem) -> Unit = {},
 ) {
     if (items.isEmpty()) return
     Column(modifier) {
@@ -130,8 +131,14 @@ fun ContinueWatchingRow(
                 "Continue Watching",
                 style = MaterialTheme.typography.titleMedium,
             )
-            TextButton(onClick = { /* no-op; screens wire their own onRemove */ }) {
-                Text("Clear", color = MaterialTheme.colorScheme.error)
+            Row {
+                TextButton(onClick = { /* no-op; screens wire their own onRemove */ }) {
+                    Text("Clear", color = MaterialTheme.colorScheme.error)
+                }
+                Spacer(Modifier.width(4.dp))
+                TextButton(onClick = { /* no-op here */ }) {
+                    Text("Finish all", color = MaterialTheme.colorScheme.primary)
+                }
             }
         }
         LazyRow(
@@ -139,7 +146,7 @@ fun ContinueWatchingRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             items(items, key = { it.key }) { w ->
-                ContinueWatchingCard(w, onPlay, onRemove)
+                ContinueWatchingCard(w, onPlay, onRemove, onMarkWatched)
             }
         }
     }
@@ -150,6 +157,7 @@ fun ContinueWatchingCard(
     w: WatchItem,
     onPlay: (WatchItem) -> Unit,
     onRemove: (WatchItem) -> Unit = {},
+    onMarkWatched: (WatchItem) -> Unit = {},
 ) {
     val runtime = w.runtimeMinutes ?: 110
     val fraction = (w.progressMinutes ?: 0).toFloat() / runtime.toFloat()
@@ -245,6 +253,13 @@ fun ContinueWatchingCard(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 2.dp),
         )
+        // Mark-watched affordance so people don't have to leave the row to finish a title.
+        TextButton(
+            onClick = { onMarkWatched(w) },
+            modifier = Modifier.padding(top = 4.dp),
+        ) {
+            Text("Mark as watched", color = MaterialTheme.colorScheme.primary)
+        }
     }
 }
 

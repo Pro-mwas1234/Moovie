@@ -47,6 +47,7 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.Moovie.app.ServiceLocator
 import com.Moovie.app.data.model.WatchItem
+import com.Moovie.app.data.model.WatchItem.Companion.STATUS_WATCHED
 import com.Moovie.app.data.remote.TmdbClient
 import com.Moovie.app.ui.components.ContinueWatchingRow
 import com.Moovie.app.ui.navigation.Routes
@@ -144,6 +145,9 @@ fun WatchlistScreen(nav: NavController, vm: WatchlistViewModel = viewModel()) {
                         onRemove = { w ->
                             vm.remove(w)
                             actionItem = null
+                        },
+                        onMarkWatched = { w ->
+                            vm.setStatus(w, WatchItem.STATUS_WATCHED)
                         },
                     )
                 }

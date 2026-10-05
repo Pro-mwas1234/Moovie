@@ -154,6 +154,62 @@ class WatchlistRepository {
         }
     }
 
+    suspend fun removeWhere(predicate: (WatchItem) -> Boolean): Result<Unit> = runCatching {
+        val uid = ServiceLocator.auth.uid ?: return Result.success(Unit)
+        val c = col(uid) ?: run {
+            local.watchFlow(uid).value = local.watchFlow(uid).value.filterNot { predicate(it) }
+            return Result.success(Unit)
+        }
+        val snap = c.get().await()
+        val batch = FirestoreGate.db()?.batch()
+        snap.documents.forEach { doc ->
+            val item = WatchItem.fromMap(doc.id, doc.data ?: emptyMap())
+            if (predicate(item)) batch?.delete(doc.reference)
+        }
+        batch?.commit()?.await()
+    }
+
+    enum class WatchlistExportFormat { Json, Csv }
+
+    suspend fun exportWatchlist(format: WatchlistExportFormat): Result<String> = runCatching {
+        val uid = ServiceLocator.auth.uid ?: return Result.failure(IllegalStateException("No user"))
+        val items = watchlistOnce(uid)
+        val ext = if (format == WatchlistExportFormat.Json) "json" else "csv"
+        val name = "moovie-watchlist-${uid.take(8)}.$ext"
+        val dir = ServiceLocator.local.filesDir
+        if (dir == null) return Result.failure(IllegalStateException("No export dir"))
+        val file = java.io.File(dir, name)
+        val content = when (format) {
+            WatchlistExportFormat.Json -> {
+                com.google.gson.Gson().toJson(
+                    items.map { mapOf(
+                        "title" to it.titleName,
+                        "mediaType" to it.mediaType,
+                        "tmdbId" to it.tmdbId,
+                        "status" to it.status,
+                        "rating" to it.rating,
+                        "progressMinutes" to it.progressMinutes,
+                        "season" to it.season,
+                        "episode" to it.episode,
+                        "runtimeMinutes" to it.runtimeMinutes,
+                        "posterPath" to it.posterPath,
+                    )
+                    }
+                )
+            }
+            WatchlistExportFormat.Csv -> {
+                buildString {
+                    appendLine("title,mediaType,tmdbId,status,rating,progressMinutes,season,episode,runtimeMinutes")
+                    items.forEach {
+                        appendLine("${it.titleName},${it.mediaType},${it.tmdbId},${it.status},${it.rating},${it.progressMinutes},${it.season},${it.episode},${it.runtimeMinutes}")
+                    }
+                }
+            }
+        }
+        file.writeText(content)
+        file.absolutePath
+    }
+
     fun stats(items: List<WatchItem>, reviewCount: Int): WatchStats {
         val watched = items.filter { it.status == WatchItem.STATUS_WATCHED }
         val hours = watched.sumOf { (it.runtimeMinutes ?: 110) } / 60

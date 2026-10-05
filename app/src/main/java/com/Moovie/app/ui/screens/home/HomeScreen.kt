@@ -63,6 +63,7 @@ import coil.compose.AsyncImage
 import com.Moovie.app.ServiceLocator
 import com.Moovie.app.data.model.Title
 import com.Moovie.app.data.model.WatchItem
+import com.Moovie.app.data.model.WatchItem.Companion.STATUS_WATCHED
 import com.Moovie.app.data.repo.GenreNames
 import com.Moovie.app.data.remote.TmdbClient
 import com.Moovie.app.ui.components.ContinueWatchingRow
@@ -235,6 +236,13 @@ fun HomeScreen(nav: NavController, vm: HomeViewModel = viewModel()) {
                         scope.launch {
                             ServiceLocator.watchlist.remove(uid, w.key)
                             snackbar.showSnackbar("Removed from Continue Watching")
+                        }
+                    },
+                    onMarkWatched = { w ->
+                        val uid = ServiceLocator.auth.uid ?: return@ContinueWatchingRow
+                        scope.launch {
+                            ServiceLocator.watchlist.setStatus(uid, w.key, WatchItem.STATUS_WATCHED)
+                            snackbar.showSnackbar("Marked ${w.titleName} as watched")
                         }
                     },
                 )

@@ -45,6 +45,7 @@ import com.Moovie.app.ServiceLocator
 import com.Moovie.app.data.model.ReviewPost
 import com.Moovie.app.data.model.Title
 import com.Moovie.app.data.model.WatchItem
+import com.Moovie.app.data.model.WatchItem.Companion.STATUS_WATCHED
 import com.Moovie.app.data.repo.WatchStats
 import com.Moovie.app.data.remote.TmdbClient
 import com.Moovie.app.ui.components.ContinueWatchingRow
@@ -62,6 +63,11 @@ class ProfileViewModel : ViewModel() {
     fun remove(item: WatchItem) {
         val uid = ServiceLocator.auth.uid ?: return
         viewModelScope.launch { ServiceLocator.watchlist.remove(uid, item.key) }
+    }
+
+    fun setStatus(item: WatchItem, status: String) {
+        val uid = ServiceLocator.auth.uid ?: return
+        viewModelScope.launch { ServiceLocator.watchlist.setStatus(uid, item.key, status) }
     }
 
     init {
@@ -168,6 +174,10 @@ fun ProfileScreen(nav: NavController, vm: ProfileViewModel = viewModel()) {
                     onRemove = { w ->
                         val uid = ServiceLocator.auth.uid ?: return@ContinueWatchingRow
                         vm.remove(w)
+                    },
+                    onMarkWatched = { w ->
+                        val uid = ServiceLocator.auth.uid ?: return@ContinueWatchingRow
+                        vm.setStatus(w, STATUS_WATCHED)
                     },
                 )
             }

@@ -2,6 +2,7 @@ package com.Moovie.app
 
 import android.content.Context
 import com.Moovie.app.ai.RecommendEngine
+import com.Moovie.app.ai.ResumeReminderScheduler
 import com.Moovie.app.data.local.PrefsRepository
 import com.Moovie.app.data.remote.TmdbApi
 import com.Moovie.app.data.remote.TmdbClient
@@ -56,6 +57,10 @@ object ServiceLocator {
     lateinit var updatePoller: com.Moovie.app.data.update.UpdatePoller
         private set
 
+    /** Sends resume-reminder notifications for stale Continue Watching items. */
+    lateinit var resumeReminder: ResumeReminderScheduler
+        private set
+
     fun init(context: Context) {
         val app = context.applicationContext
         local.attach(app)
@@ -72,5 +77,7 @@ object ServiceLocator {
         downloadManager = DownloadManager(app)
         updatePoller = com.Moovie.app.data.update.UpdatePoller(appScope)
         updatePoller.start()
+        resumeReminder = ResumeReminderScheduler(appScope)
+        resumeReminder.start()
     }
 }

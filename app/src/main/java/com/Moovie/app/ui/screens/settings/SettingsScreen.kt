@@ -52,6 +52,8 @@ import com.Moovie.app.data.local.AccentColor
 import com.Moovie.app.data.local.ThemeMode
 import com.Moovie.app.ui.navigation.Routes
 import com.Moovie.app.ui.theme.accentSwatch
+import com.Moovie.app.data.repo.WatchlistRepository
+import com.Moovie.app.data.repo.WatchlistRepository.WatchlistExportFormat
 import kotlinx.coroutines.launch
 
 @Composable
@@ -157,9 +159,34 @@ fun SettingsScreen(nav: NavController) {
                 onClick = { scope.launch { ServiceLocator.prefs.clearRecentSearches() } },
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Clear recent searches") }
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = { scope.launch { ServiceLocator.watchlist.exportWatchlist(format = com.Moovie.app.data.repo.WatchlistRepository.WatchlistExportFormat.Json) } },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Export watchlist + progress")
+            }
         }
 
         SettingGroup("Account") {
+            if (account != null && !account.isAnonymous) {
+                OutlinedButton(
+                    onClick = {
+                        scope.launch {
+                            ServiceLocator.auth.updateDisplayName("")
+                            ServiceLocator.watchlist.removeWhere { true }
+                            ServiceLocator.downloads.removeWhere { true }
+                            ServiceLocator.social.deleteAllMyReviews()
+                            ServiceLocator.social.markAllNotificationsRead()
+                            ServiceLocator.local.clearAll()
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Delete account and all data", color = MaterialTheme.colorScheme.error)
+                }
+                Spacer(Modifier.height(8.dp))
+            }
             if (account != null && !account.isAnonymous) {
                 Text(
                     "Signed in as ${account.name ?: "user"}",

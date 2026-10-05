@@ -32,6 +32,23 @@ class RecommendEngine(private val tmdb: MovieRepository) {
 
     data class Reply(val intro: String, val suggestions: List<Suggestion>)
 
+    /** Simple per-title feedback persisted locally so future heuristic picks can
+     * bias away from titles the user thumbs downed and toward titles they thumb
+     * upped. This is local-only and resets when the app data is cleared.
+     */
+    private val feedbackStore = mutableMapOf<String, Int>() // tmdbId -> +1 / -1
+
+    fun recordFeedback(tmdbId: Int, mediaType: String, liked: Boolean) {
+        synchronized(feedbackStore) {
+            val key = "${mediaType}-$tmdbId"
+            if (feedbackStore[key] == if (liked) 1 else -1) return@recordFeedback
+            feedbackStore[key] = if (liked) 1 else -1
+        }
+    }
+
+    /** Current local dislike set, used to bias heuristic picks away from disliked titles. */
+    fun dislikedIds(): Set<String> = synchronized(feedbackStore) { feedbackStore.filterValues { it < 0 }.keys }.toSet()
+
     // ---------- Heuristic engine ----------
 
     data class Vibe(val id: String, val words: List<String>, val genreIds: List<Int>, val keywordIds: List<Int>)
@@ -126,10 +143,13 @@ class RecommendEngine(private val tmdb: MovieRepository) {
             vibePicks += results.take(6) // take top 6 per vibe
         }
 
-        // Combine seed recs and vibe picks, limit and fill with popular if neededf needed.
-        val picked = (seedResults + vibePicks).distinctBy { it.id }.take(12)
+        // Combine seed recs and vibe picks, limit and fill with popular if needed.
+        val disliked = dislikedIds()
+        val picked = (seedResults + vibePicks).distinctBy { it.id }
+            .filter { "${it.mediaType}-${it.id}" !in disliked }
+            .take(12)
         val filler = if (picked.size < 6) {
-            runCatching { tmdb.popular() }.getOrDefault(emptyList())
+            runCatching { tmdb.popular() }.getOrDefault(emptyList()).filter { "${it.mediaType}-${it.id}" !in disliked }
         } else emptyList()
         val final = (picked + filler).distinctBy { it.id }.take(8)
 
