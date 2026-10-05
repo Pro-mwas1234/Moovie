@@ -70,8 +70,9 @@ fun PlayerScreen(nav: NavController, vm: PlayerViewModel) {
     }
 
     // Keep the screen on while the player is open (both embed and native).
+    // LocalContext.current is composable-only, so read it here (not in the effect).
+    val activity = androidx.compose.ui.platform.LocalContext.current.findActivity()
     androidx.compose.runtime.DisposableEffect(Unit) {
-        val activity = androidx.compose.ui.platform.LocalContext.current.findActivity()
         activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         onDispose {
             activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
