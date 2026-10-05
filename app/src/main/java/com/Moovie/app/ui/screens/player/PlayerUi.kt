@@ -131,13 +131,15 @@ fun PlayerScreen(nav: NavController, vm: PlayerViewModel) {
             }
         }
 
-        // Player: embed is primary; native MP4 only when explicitly toggled
-        // (bolt icon) or when playing a fully-downloaded local file.
-        val isLocalFile = directStream?.startsWith("/") == true
-        if ((preferNative || isLocalFile) && directStream != null) {
+        // Player: a downloaded file (content:// MediaStore URI or /file/path)
+        // always wins over the online embed and plays natively; an http(s)
+        // directStream is a resolved OmniSave stream, switchable via the bolt.
+        val stream = directStream
+        val isLocalFile = stream != null && !stream.startsWith("http")
+        if (stream != null && (preferNative || isLocalFile)) {
             Column(Modifier.fillMaxWidth().weight(1f)) {
                 ExoPlayerScreen(
-                    url = directStream!!,
+                    url = stream,
                     modifier = Modifier.fillMaxSize(),
                     onPosition = { vm.reportPosition(it) },
                 )
@@ -329,7 +331,10 @@ private fun ExoPlayerScreen(url: String, modifier: Modifier = Modifier, onPositi
             )
             .build()
             .apply {
-                val uri = if (url.startsWith("/")) "file://$url" else url
+                // Downloaded files arrive as content:// (MediaStore) or as a
+                // bare file path; only bare paths get the file:// scheme.
+                val uri = if (url.startsWith("/")) android.net.Uri.fromFile(java.io.File(url))
+                    else android.net.Uri.parse(url)
                 setMediaItem(androidx.media3.common.MediaItem.fromUri(uri))
                 prepare()
                 playWhenReady = true

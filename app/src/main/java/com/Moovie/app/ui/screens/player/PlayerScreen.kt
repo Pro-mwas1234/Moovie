@@ -107,20 +107,11 @@ class PlayerViewModel(
                 }
             } catch (_: Exception) {
             }
-            // Prefer an already-downloaded local file; otherwise try to resolve
-            // a direct MP4 for native playback. The WebView embed stays as
+            // A downloaded local file always wins over online providers.
+            // Otherwise resolve a direct MP4 (per-episode for TV so the right
+            // episode plays natively). The WebView embed stays as the last
             // fallback when both fail.
-            val local = runCatching {
-                val uid = ServiceLocator.auth.ensureUid()
-                if (uid != null) ServiceLocator.downloads.findItem(uid, downloadKey()) else null
-            }.getOrNull()
-            if (local?.localPath != null && ServiceLocator.downloadFiles.exists(local.localPath)) {
-                directStream.value = local.localPath
-            } else {
-                titleName.value.takeIf { it.isNotBlank() }?.let { name ->
-                    directStream.value = OmniSaveClient.resolveStream(name)
-                }
-            }
+            resolveDirectStream()
         }
         refreshDownload()
     }
@@ -130,11 +121,40 @@ class PlayerViewModel(
         currentEpisode.value = 1
         viewModelScope.launch { loadEpisodes(s) }
         refreshDownload()
+        viewModelScope.launch { resolveDirectStream() }
     }
 
     fun setEpisode(e: Int) {
         currentEpisode.value = e
         refreshDownload()
+        viewModelScope.launch { resolveDirectStream() }
+    }
+
+    /**
+     * Re-resolves the native stream for the current season/episode: a
+     * downloaded local file always wins; otherwise the per-episode OmniSave
+     * MP4. Called on init and whenever the episode changes.
+     */
+    private suspend fun resolveDirectStream() {
+        val local = runCatching {
+            val uid = ServiceLocator.auth.ensureUid()
+            if (uid != null) ServiceLocator.downloads.findItem(uid, downloadKey()) else null
+        }.getOrNull()
+        if (local?.localPath != null && ServiceLocator.downloadFiles.exists(local.localPath)) {
+            directStream.value = local.localPath
+            return
+        }
+        val name = titleName.value.takeIf { it.isNotBlank() } ?: return
+        directStream.value = if (mediaType == "tv") {
+            OmniSaveClient.resolveStream(
+                title = name,
+                season = currentSeason.value,
+                episode = currentEpisode.value,
+                preferTv = true,
+            )
+        } else {
+            OmniSaveClient.resolveStream(name)
+        }
     }
 
     private fun refreshDownload() {
