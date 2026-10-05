@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -18,12 +19,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.Moovie.app.ServiceLocator
 import com.Moovie.app.data.model.DownloadItem
 import com.Moovie.app.data.remote.OmniSaveClient
+import com.Moovie.app.data.remote.Caption
 import com.Moovie.app.data.remote.StreamQuality
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -44,6 +47,8 @@ class DownloadViewModel(
     val loading = MutableStateFlow(false)
     val error = MutableStateFlow<String?>(null)
     val qualities = MutableStateFlow<List<StreamQuality>>(emptyList())
+    val subtitles = MutableStateFlow<List<Caption>>(emptyList())
+    val selectedSubtitle = MutableStateFlow<Caption?>(null)
     /** Set right after DownloadManager accepts the job; the dialog closes then. */
     val started = MutableStateFlow(false)
 
@@ -59,6 +64,7 @@ class DownloadViewModel(
             val query = listOf(title, year?.toString().orEmpty()).joinToString(" ").trim()
             searchTitle = title
             qualities.value = OmniSaveClient.resolveQualitiesDetailed(query)
+            subtitles.value = OmniSaveClient.resolveSubtitles(query)
             if (qualities.value.isEmpty()) {
                 error.value = "No downloadable source found for this title."
             }
@@ -84,6 +90,12 @@ class DownloadViewModel(
                 episode = episode,
                 preferTv = true,
             )
+            subtitles.value = OmniSaveClient.resolveSubtitles(
+                title = query,
+                season = season,
+                episode = episode,
+                preferTv = true,
+            )
             if (qualities.value.isEmpty()) {
                 error.value = "No downloadable source found for S${season}E$episode."
             }
@@ -96,8 +108,14 @@ class DownloadViewModel(
      * Guarantees an auth session first (self-heals a missing guest sign-in) and
      * reports failure through [error] instead of dying silently — the dialog
      * stays open so the user sees what happened.
+     * Pass [subtitle] to download a subtitle track alongside the video.
      */
-    fun startDownload(item: DownloadItem, quality: StreamQuality, onStarted: () -> Unit) {
+    fun startDownload(
+        item: DownloadItem,
+        quality: StreamQuality,
+        subtitle: Caption? = null,
+        onStarted: () -> Unit,
+    ) {
         if (quality.vipLocked || quality.url.isBlank()) return
         viewModelScope.launch {
             try {
@@ -108,7 +126,9 @@ class DownloadViewModel(
                 }
                 // Persist first so DownloadManager's update() finds the row.
                 ServiceLocator.downloads.addOrUpdate(uid, item)
-                ServiceLocator.downloadManager.enqueue(item, quality.url)
+                ServiceLocator.downloadManager.enqueue(
+                    item, quality.url, subtitle?.url?.takeIf { it.isNotBlank() },
+                )
                 started.value = true
                 onStarted()
             } catch (e: Exception) {
@@ -182,6 +202,28 @@ private fun QualityRow(quality: StreamQuality, enabled: Boolean, onPick: () -> U
     }
 }
 
+/** One subtitle row; the selected language is bolded. */
+@Composable
+private fun SubtitleRow(label: String, selected: Boolean, onPick: () -> Unit) {
+    TextButton(
+        onClick = onPick,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                label,
+                fontWeight = if (selected) androidx.compose.ui.text.font.FontWeight.Bold
+                    else androidx.compose.ui.text.font.FontWeight.Normal,
+                color = if (selected) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurface,
+            )
+        }
+    }
+}
+
 @Composable
 fun DownloadDialog(
     titleName: String,
@@ -194,6 +236,8 @@ fun DownloadDialog(
     val loading by vm.loading.collectAsState()
     val error by vm.error.collectAsState()
     val qualities by vm.qualities.collectAsState()
+    val subtitles by vm.subtitles.collectAsState()
+    val selectedSubtitle by vm.selectedSubtitle.collectAsState()
     val started by vm.started.collectAsState()
 
     if (started) return
@@ -221,6 +265,30 @@ fun DownloadDialog(
                     )
 
                     else -> {
+                        // Subtitle section
+                        if (subtitles.isNotEmpty()) {
+                            Text(
+                                "Subtitles",
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            SubtitleRow(
+                                label = "None",
+                                selected = selectedSubtitle == null,
+                                onPick = { vm.selectedSubtitle.value = null },
+                            )
+                            subtitles.forEach { sub ->
+                                SubtitleRow(
+                                    label = sub.lanName ?: sub.lan ?: "Unknown",
+                                    selected = selectedSubtitle?.url == sub.url,
+                                    onPick = { vm.selectedSubtitle.value = sub },
+                                )
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            HorizontalDivider()
+                            Spacer(Modifier.height(8.dp))
+                        }
+
                         Text(
                             "Pick a resolution — the file is saved to this device for offline playback.",
                             style = MaterialTheme.typography.bodySmall,
@@ -235,6 +303,7 @@ fun DownloadDialog(
                                     vm.startDownload(
                                         vm.itemFor(posterPath, year),
                                         q,
+                                        selectedSubtitle,
                                     ) { onDismiss() }
                                 },
                             )
@@ -271,6 +340,8 @@ fun EpisodeDownloadDialog(
     val loading by vm.loading.collectAsState()
     val error by vm.error.collectAsState()
     val qualities by vm.qualities.collectAsState()
+    val subtitles by vm.subtitles.collectAsState()
+    val selectedSubtitle by vm.selectedSubtitle.collectAsState()
     val started by vm.started.collectAsState()
 
     if (started) return
@@ -323,6 +394,29 @@ fun EpisodeDownloadDialog(
                     }
 
                     else -> {
+                        if (subtitles.isNotEmpty()) {
+                            Text(
+                                "Subtitles",
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            SubtitleRow(
+                                label = "None",
+                                selected = selectedSubtitle == null,
+                                onPick = { vm.selectedSubtitle.value = null },
+                            )
+                            subtitles.forEach { sub ->
+                                SubtitleRow(
+                                    label = sub.lanName ?: sub.lan ?: "Unknown",
+                                    selected = selectedSubtitle?.url == sub.url,
+                                    onPick = { vm.selectedSubtitle.value = sub },
+                                )
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            HorizontalDivider()
+                            Spacer(Modifier.height(8.dp))
+                        }
+
                         Text(
                             "Pick a resolution — the file is saved to this device for offline playback.",
                             style = MaterialTheme.typography.bodySmall,
@@ -339,6 +433,7 @@ fun EpisodeDownloadDialog(
                                             showName, season, episode, episodeName, airYear, posterPath,
                                         ),
                                         q,
+                                        selectedSubtitle,
                                     ) { onDismiss() }
                                 },
                             )

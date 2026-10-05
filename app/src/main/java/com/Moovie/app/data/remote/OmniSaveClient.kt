@@ -83,6 +83,12 @@ object OmniSaveClient {
     }    /**
      * Resolves a direct, playable MP4 URL for the given title.
      * Picks the highest resolution non-VIP stream.
+     *
+     * Tries each usable search hit in order. For each hit, tries the
+     * /subject/play endpoint first — it returns all streams including 1080p
+     * even for guest tokens (the VIP gate is only on /subject/download), then
+     * falls back to /subject/download (max 720p for guests).
+     *
      * For series episodes pass [season]/[episode] (1-based) and [preferTv] = true
      * so the search prefers TV matches and the download call targets that episode.
      * Returns null when the title can't be found (caller should fall back).
@@ -97,24 +103,50 @@ object OmniSaveClient {
         runCatching {
             ensureToken()
             val search = api.search(SearchReq(keyword = title))
-            val item = pickItem(search.body()?.data?.items.orEmpty(), preferTv)
-                ?: return@withContext null
-            val dl = api.download(
-                subjectId = item.subjectId,
-                detailPath = item.detailPath!!, 
-                season = season,
-                episode = episode,
-            )
-            dl.body()?.data?.downloads
-                ?.filter { !it.vipLocked && !it.url.isNullOrBlank() }
-                ?.maxByOrNull { it.resolution ?: 0 }
-                ?.url
+            val usable = search.body()?.data?.items.orEmpty()
+                .filter { it.hasResource && !it.detailPath.isNullOrBlank() }
+            val ordered = if (preferTv) {
+                usable.filter { it.subjectType != 1 } + usable.filter { it.subjectType == 1 }
+            } else {
+                usable
+            }
+            for (item in ordered) {
+                // /subject/play returns all streams incl. 1080p even for guest
+                // tokens — the VIP gate is only on /subject/download.
+                val play = api.play(
+                    subjectId = item.subjectId,
+                    season = season,
+                    episode = episode,
+                )
+                val playUrl = play.body()?.data?.streams
+                    ?.filter { !it.vipLocked && !it.url.isNullOrBlank() }
+                    ?.maxByOrNull { it.resolutions?.toIntOrNull() ?: 0 }
+                    ?.url
+                if (playUrl != null) return@withContext playUrl
+                // Fallback to /subject/download (max 720p for guests).
+                val dl = api.download(
+                    subjectId = item.subjectId,
+                    detailPath = item.detailPath!!,
+                    season = season,
+                    episode = episode,
+                )
+                val dlUrl = dl.body()?.data?.downloads
+                    ?.filter { !it.vipLocked && !it.url.isNullOrBlank() }
+                    ?.maxByOrNull { it.resolution ?: 0 }
+                    ?.url
+                if (dlUrl != null) return@withContext dlUrl
+            }
+            null
         }.getOrNull()
     }
 
     /**
      * All qualities incl. VIP-locked tiers (url null, vipLocked true) so the UI
-     * can show *why* 720p isn't downloadable instead of hiding it.
+     * can show *why* a resolution isn't downloadable instead of hiding it.
+     *
+     * Merges streams from both /subject/play (returns all tiers incl. 1080p as
+     * playable for guest tokens) and /subject/download (VIP-locked tiers).
+     * Play streams take priority; download fills in any resolutions not in play.
      */
     suspend fun resolveQualitiesDetailed(
         title: String,
@@ -129,24 +161,72 @@ object OmniSaveClient {
                     .orEmpty().let { pickItem(it, preferTv) }
             }.getOrNull() ?: return@withContext emptyList()
             runCatching {
-                api.download(
+                // Play endpoint: all tiers playable (incl. 1080p).
+                val playStreams = api.play(
                     subjectId = item.subjectId,
-                    detailPath = item.detailPath!!, 
                     season = season,
                     episode = episode,
-                ).body()?.data?.downloads
-                    ?.filter { !it.url.isNullOrBlank() }
-                    ?.sortedByDescending { it.resolution ?: 0 }
-                    ?.map {
+                ).body()?.data?.streams.orEmpty()
+                    .filter { !it.url.isNullOrBlank() }
+                    .associateBy { it.resolutions?.toIntOrNull() ?: 0 }
+                // Download endpoint: includes VIP-locked tiers + subtitles.
+                val dlDownloads = api.download(
+                    subjectId = item.subjectId,
+                    detailPath = item.detailPath!!,
+                    season = season,
+                    episode = episode,
+                ).body()?.data?.downloads.orEmpty()
+                    .associateBy { it.resolution ?: 0 }
+                // Merge: play takes priority, download fills gaps.
+                val allResolutions = (playStreams.keys + dlDownloads.keys)
+                    .distinct()
+                    .sortedDescending()
+                allResolutions.mapNotNull { res ->
+                    playStreams[res]?.let { stream ->
                         StreamQuality(
-                            url = if (it.vipLocked) "" else it.url!!,
-                            resolution = it.resolution ?: 0,
-                            format = it.format ?: "MP4",
-                            vipLocked = it.vipLocked,
-                            size = it.size,
+                            url = stream.url!!,
+                            resolution = res,
+                            format = stream.format ?: "MP4",
+                            vipLocked = false,
+                            size = stream.size,
+                        )
+                    } ?: dlDownloads[res]?.let { entry ->
+                        StreamQuality(
+                            url = if (entry.vipLocked) "" else (entry.url ?: ""),
+                            resolution = res,
+                            format = entry.format ?: "MP4",
+                            vipLocked = entry.vipLocked,
+                            size = entry.size,
                         )
                     }
-                    ?: emptyList()
+                }
+            }.getOrDefault(emptyList())
+        }
+
+    /**
+     * Available subtitle tracks for a title. Returns empty when the source has
+     * no captions or the title can't be found.
+     */
+    suspend fun resolveSubtitles(
+        title: String,
+        season: Int = 0,
+        episode: Int = 0,
+        preferTv: Boolean = false,
+    ): List<Caption> =
+        withContext(Dispatchers.IO) {
+            val item = runCatching {
+                ensureToken()
+                api.search(SearchReq(keyword = title)).body()?.data?.items
+                    .orEmpty().let { pickItem(it, preferTv) }
+            }.getOrNull() ?: return@withContext emptyList()
+            runCatching {
+                api.download(
+                    subjectId = item.subjectId,
+                    detailPath = item.detailPath!!,
+                    season = season,
+                    episode = episode,
+                ).body()?.data?.captions.orEmpty()
+                    .filter { !it.url.isNullOrBlank() }
             }.getOrDefault(emptyList())
         }
 
@@ -201,6 +281,14 @@ interface OmniSaveApi {
         // Retrofit encodes the bracketed key as supportCodecs%5Bh264%5D=1.
         @Query("supportCodecs[h264]") supportH264: Int = 1,
     ): Response<DownloadResp>
+
+    @GET("subject/play")
+    suspend fun play(
+        @Query("subjectId") subjectId: String,
+        @Query("se") season: Int = 0,
+        @Query("ep") episode: Int = 0,
+        @Query("supportCodecs[h264]") supportH264: Int = 1,
+    ): Response<PlayResp>
 }
 
 // ---------- DTOs ----------
@@ -262,4 +350,26 @@ data class Caption(
     val lanName: String? = null,
     val url: String? = null,
     val size: String? = null,
+)
+
+data class PlayResp(val code: Int = 0, val message: String? = null, val data: PlayData? = null)
+
+data class PlayData(
+    val streams: List<PlayStream> = emptyList(),
+    val hls: List<Any> = emptyList(),
+    val dash: List<Any> = emptyList(),
+    val playConfig: PlayConfig? = null,
+)
+
+data class PlayConfig(val adFree: Boolean = false, val maxResolution: Int = 0)
+
+data class PlayStream(
+    val id: String? = null,
+    val url: String? = null,
+    val format: String? = null,
+    @SerializedName("resolutions") val resolutions: String? = null,
+    val size: String? = null,
+    val duration: Long? = null,
+    val codecName: String? = null,
+    @SerializedName("vipLocked") val vipLocked: Boolean = false,
 )

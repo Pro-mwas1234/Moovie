@@ -84,6 +84,8 @@ data class DownloadItem(
     val status: String = STATUS_QUEUED,
     val progressPercent: Int = 0,
     val localPath: String? = null,
+    val subtitlePath: String? = null,
+    val subtitleLang: String? = null,
     val addedAt: Timestamp? = null,
     val updatedAt: Timestamp? = null,
 ) {
@@ -100,6 +102,8 @@ data class DownloadItem(
         "status" to status,
         "progressPercent" to progressPercent,
         "localPath" to localPath,
+        "subtitlePath" to subtitlePath,
+        "subtitleLang" to subtitleLang,
         "addedAt" to (addedAt ?: Timestamp.now()),
         "updatedAt" to Timestamp.now(),
     )
@@ -123,6 +127,8 @@ data class DownloadItem(
             status = m["status"] as? String ?: STATUS_QUEUED,
             progressPercent = (m["progressPercent"] as? Long)?.toInt() ?: 0,
             localPath = m["localPath"] as? String,
+            subtitlePath = m["subtitlePath"] as? String,
+            subtitleLang = m["subtitleLang"] as? String,
             addedAt = m["addedAt"] as? Timestamp,
             updatedAt = m["updatedAt"] as? Timestamp,
         )

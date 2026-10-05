@@ -38,9 +38,10 @@ class DownloadManager(private val context: Context) {
     /**
      * Starts a download. Pass [url] (from the quality picker) to skip automatic
      * resolution; otherwise the best available quality is resolved by title.
+     * Pass [subtitleUrl] to download a subtitle track alongside the video.
      * Self-heals a missing auth session via ensureUid instead of silently no-oping.
      */
-    fun enqueue(item: DownloadItem, url: String? = null) {
+    fun enqueue(item: DownloadItem, url: String? = null, subtitleUrl: String? = null) {
         val key = item.key
         if (jobs.containsKey(key)) return
         active.value = active.value + key
@@ -87,7 +88,17 @@ class DownloadManager(private val context: Context) {
                     else update(uid, key, backend = false) { it.copy(progressPercent = pct) }
                 }
 
-                // 3. Publish into the shared Movies/Moovie gallery (MediaStore)
+                // 3. Download subtitle alongside the video (if provided).
+                var subtitlePath: String? = null
+                if (!subtitleUrl.isNullOrBlank()) {
+                    runCatching {
+                        val subDest = subtitleFileFor(item)
+                        downloadTo(subtitleUrl, subDest) { } // no progress for subtitles
+                        subtitlePath = subDest.absolutePath
+                    }
+                }
+
+                // 4. Publish into the shared Movies/Moovie gallery (MediaStore)
                 //    so the file shows up in gallery apps and survives updates,
                 //    then mark ready with the playback path (content:// URI on
                 //    modern Android, file path on older devices).
@@ -95,7 +106,15 @@ class DownloadManager(private val context: Context) {
                     dest, ServiceLocator.downloadFiles.displayNameFor(item),
                 )
                 update(uid, key) {
-                    it.copy(status = DownloadItem.STATUS_READY, progressPercent = 100, localPath = playbackPath)
+                    it.copy(
+                        status = DownloadItem.STATUS_READY,
+                        progressPercent = 100,
+                        localPath = playbackPath,
+                        subtitlePath = subtitlePath,
+                        subtitleLang = subtitlePath?.let { sub ->
+                            item.titleName.substringBefore(" · S").substringBefore(" — ")
+                        },
+                    )
                 }
                 if (playbackPath != dest.absolutePath) dest.delete()
             } catch (e: Exception) {
@@ -121,9 +140,16 @@ class DownloadManager(private val context: Context) {
     /** Deletes the local file (MediaStore row or file; kept in list, back to queued). */
     fun deleteLocal(uid: String, item: DownloadItem) {
         ServiceLocator.downloadFiles.delete(item.localPath)
+        ServiceLocator.downloadFiles.delete(item.subtitlePath)
         ServiceLocator.appScope.launch {
             ServiceLocator.downloads.addOrUpdate(
-                uid, item.copy(status = DownloadItem.STATUS_QUEUED, progressPercent = 0, localPath = null)
+                uid, item.copy(
+                    status = DownloadItem.STATUS_QUEUED,
+                    progressPercent = 0,
+                    localPath = null,
+                    subtitlePath = null,
+                    subtitleLang = null,
+                )
             )
         }
     }
@@ -146,6 +172,13 @@ class DownloadManager(private val context: Context) {
         val safe = item.titleName.replace(Regex("[<>:\"/\\\\|?*]"), "").trim().take(80).ifBlank { item.key }
         val se = item.season?.let { s -> item.episode?.let { e -> ".S$s.E$e" } } ?: ""
         return File(dir, "$safe$se.${item.key.hashCode().toUInt()}.mp4")
+    }
+
+    private fun subtitleFileFor(item: DownloadItem): File {
+        val dir = File(context.getExternalFilesDir(null) ?: context.filesDir, "movies").apply { mkdirs() }
+        val safe = item.titleName.replace(Regex("[<>:\"/\\\\|?*]"), "").trim().take(80).ifBlank { item.key }
+        val se = item.season?.let { s -> item.episode?.let { e -> ".S$s.E$e" } } ?: ""
+        return File(dir, "$safe$se.${item.key.hashCode().toUInt()}.srt")
     }
 
     private suspend fun downloadTo(url: String, dest: File, onProgress: suspend (Int) -> Unit) =

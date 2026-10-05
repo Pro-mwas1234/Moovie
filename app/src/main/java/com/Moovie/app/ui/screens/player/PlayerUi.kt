@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.DownloadDone
 import android.annotation.SuppressLint
+import android.view.WindowManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -66,6 +67,15 @@ fun PlayerScreen(nav: NavController, vm: PlayerViewModel) {
     androidx.compose.runtime.DisposableEffect(Unit) {
         vm.startWatching()
         onDispose { vm.finishWatching() }
+    }
+
+    // Keep the screen on while the player is open (both embed and native).
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        val activity = androidx.compose.ui.platform.LocalContext.current.findActivity()
+        activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose {
+            activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
     }
 
     Column(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black)) {
