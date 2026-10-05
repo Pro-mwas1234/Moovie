@@ -22,11 +22,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarOutline
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -104,31 +107,50 @@ fun MovieRow(titleText: String, titles: List<Title>, modifier: Modifier = Modifi
 }
 
 /**
- * In-progress titles with poster, play badge, S/E chip and a progress bar.
- * Tapping resumes the player directly. Shared by Home, Watchlist and Profile.
+ * In-progress titles with poster, play badge, S/E chip, progress bar and a
+ * remove button. Tapping the poster resumes the player; the remove button
+ * drops the title from the Continue Watching list (and the watchlist).
+ * Shared by Home, Watchlist and Profile.
  */
 @Composable
-fun ContinueWatchingRow(items: List<WatchItem>, modifier: Modifier = Modifier, onPlay: (WatchItem) -> Unit) {
+fun ContinueWatchingRow(
+    items: List<WatchItem>,
+    modifier: Modifier = Modifier,
+    onPlay: (WatchItem) -> Unit,
+    onRemove: (WatchItem) -> Unit = {},
+) {
     if (items.isEmpty()) return
     Column(modifier) {
-        Text(
-            "Continue Watching",
-            style = MaterialTheme.typography.titleMedium,
+        Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        )
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "Continue Watching",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            TextButton(onClick = { /* no-op; screens wire their own onRemove */ }) {
+                Text("Clear", color = MaterialTheme.colorScheme.error)
+            }
+        }
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             items(items, key = { it.key }) { w ->
-                ContinueWatchingCard(w, onPlay)
+                ContinueWatchingCard(w, onPlay, onRemove)
             }
         }
     }
 }
 
 @Composable
-fun ContinueWatchingCard(w: WatchItem, onPlay: (WatchItem) -> Unit) {
+fun ContinueWatchingCard(
+    w: WatchItem,
+    onPlay: (WatchItem) -> Unit,
+    onRemove: (WatchItem) -> Unit = {},
+) {
     val runtime = w.runtimeMinutes ?: 110
     val fraction = (w.progressMinutes ?: 0).toFloat() / runtime.toFloat()
     Column(
@@ -178,6 +200,20 @@ fun ContinueWatchingCard(w: WatchItem, onPlay: (WatchItem) -> Unit) {
                             RoundedCornerShape(6.dp),
                         )
                         .padding(horizontal = 5.dp, vertical = 2.dp),
+                )
+            }
+            IconButton(
+                onClick = { onRemove(w) },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(4.dp)
+                    .size(28.dp),
+            ) {
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = "Remove from Continue Watching",
+                    tint = Color.White.copy(alpha = 0.85f),
+                    modifier = Modifier.size(18.dp),
                 )
             }
         }

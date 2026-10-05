@@ -230,6 +230,13 @@ fun HomeScreen(nav: NavController, vm: HomeViewModel = viewModel()) {
                 ContinueWatchingRow(
                     continueWatching,
                     onPlay = { w -> nav.navigate(Routes.player(w.mediaType, w.tmdbId, w.season ?: 1, w.episode ?: 1)) },
+                    onRemove = { w ->
+                        val uid = ServiceLocator.auth.uid ?: return@ContinueWatchingRow
+                        scope.launch {
+                            ServiceLocator.watchlist.remove(uid, w.key)
+                            snackbar.showSnackbar("Removed from Continue Watching")
+                        }
+                    },
                 )
             }
         }

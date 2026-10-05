@@ -141,6 +141,10 @@ fun WatchlistScreen(nav: NavController, vm: WatchlistViewModel = viewModel()) {
                     ContinueWatchingRow(
                         continueWatching,
                         onPlay = { w -> nav.navigate(Routes.player(w.mediaType, w.tmdbId, w.season ?: 1, w.episode ?: 1)) },
+                        onRemove = { w ->
+                            vm.remove(w)
+                            actionItem = null
+                        },
                     )
                 }
             LazyVerticalGrid(

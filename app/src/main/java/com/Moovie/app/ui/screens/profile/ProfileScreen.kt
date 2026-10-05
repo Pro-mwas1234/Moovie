@@ -59,6 +59,11 @@ class ProfileViewModel : ViewModel() {
     val favorites = MutableStateFlow<List<WatchItem>>(emptyList())
     val continueWatching = MutableStateFlow<List<WatchItem>>(emptyList())
 
+    fun remove(item: WatchItem) {
+        val uid = ServiceLocator.auth.uid ?: return
+        viewModelScope.launch { ServiceLocator.watchlist.remove(uid, item.key) }
+    }
+
     init {
         viewModelScope.launch {
             // ensureUid mints a guest session when none exists, so stats work
@@ -160,6 +165,10 @@ fun ProfileScreen(nav: NavController, vm: ProfileViewModel = viewModel()) {
                 ContinueWatchingRow(
                     continueWatching,
                     onPlay = { w -> nav.navigate(Routes.player(w.mediaType, w.tmdbId, w.season ?: 1, w.episode ?: 1)) },
+                    onRemove = { w ->
+                        val uid = ServiceLocator.auth.uid ?: return@ContinueWatchingRow
+                        vm.remove(w)
+                    },
                 )
             }
         }
