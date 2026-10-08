@@ -292,7 +292,10 @@ fun WebViewPlayer(url: String, reloadKey: Int = 0, modifier: Modifier = Modifier
             update = { web ->
                 if (web.url != url) web.loadUrl(url)
             },
-            onRelease = { it.destroy() },
+            onRelease = {
+                it.clearCache(true)
+                it.destroy()
+            },
         )
     }
 }

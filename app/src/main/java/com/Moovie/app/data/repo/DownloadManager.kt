@@ -9,6 +9,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.first
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
@@ -167,15 +168,38 @@ class DownloadManager(private val context: Context) {
         repo.addOrUpdate(uid, next)
     }
 
-    private fun fileFor(item: DownloadItem): File {
-        val dir = File(context.getExternalFilesDir(null) ?: context.filesDir, "movies").apply { mkdirs() }
+    /**
+     * Resolves the download base directory from the user's preference.
+     * Path must not contain ".." or start with "/" (no absolute escapes).
+     * Falls back to the default "movies" dir and logs a warning on failure.
+     */
+    internal suspend fun downloadDir(): File {
+        val default = File(context.getExternalFilesDir(null) ?: context.filesDir, "movies")
+        val folder = ServiceLocator.prefs.prefs.first().downloadFolder
+        if (folder.isBlank()) { default.mkdirs(); return default }
+        if (folder.contains("..") || folder.startsWith("/") || folder.startsWith("\\")) {
+            android.util.Log.w(TAG, "Rejected unsafe download folder: $folder")
+            default.mkdirs()
+            return default
+        }
+        val resolved = File(context.getExternalFilesDir(null) ?: context.filesDir, folder)
+        if ((resolved.exists() || resolved.mkdirs()) && resolved.isDirectory && resolved.canWrite()) {
+            return resolved
+        }
+        android.util.Log.w(TAG, "Configured download folder not writable, falling back: $resolved")
+        default.mkdirs()
+        return default
+    }
+
+    private suspend fun fileFor(item: DownloadItem): File {
+        val dir = downloadDir()
         val safe = item.titleName.replace(Regex("[<>:\"/\\\\|?*]"), "").trim().take(80).ifBlank { item.key }
         val se = item.season?.let { s -> item.episode?.let { e -> ".S$s.E$e" } } ?: ""
         return File(dir, "$safe$se.${item.key.hashCode().toUInt()}.mp4")
     }
 
-    private fun subtitleFileFor(item: DownloadItem): File {
-        val dir = File(context.getExternalFilesDir(null) ?: context.filesDir, "movies").apply { mkdirs() }
+    private suspend fun subtitleFileFor(item: DownloadItem): File {
+        val dir = downloadDir()
         val safe = item.titleName.replace(Regex("[<>:\"/\\\\|?*]"), "").trim().take(80).ifBlank { item.key }
         val se = item.season?.let { s -> item.episode?.let { e -> ".S$s.E$e" } } ?: ""
         return File(dir, "$safe$se.${item.key.hashCode().toUInt()}.srt")

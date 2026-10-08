@@ -43,6 +43,7 @@ data class AppPrefs(
     val region: String = "US",
     val recentSearches: List<String> = emptyList(),
     val trendingSearches: Set<String> = emptySet(),
+    val downloadFolder: String = "",
 )
 
 class PrefsRepository(private val context: Context) {
@@ -56,6 +57,7 @@ class PrefsRepository(private val context: Context) {
         val REGION = stringPreferencesKey("region")
         val RECENTS = stringSetPreferencesKey("recent_searches")
         val TRENDING_SEARCHES = stringSetPreferencesKey("trending_searches")
+        val DOWNLOAD_FOLDER = stringPreferencesKey("download_folder")
     }
 
     val prefs: Flow<AppPrefs> = context.dataStore.data.map { p ->
@@ -73,6 +75,7 @@ class PrefsRepository(private val context: Context) {
             region = p[Keys.REGION] ?: "US",
             recentSearches = (p[Keys.RECENTS] ?: emptySet()).toList(),
             trendingSearches = p[Keys.TRENDING_SEARCHES] ?: emptySet(),
+            downloadFolder = p[Keys.DOWNLOAD_FOLDER] ?: "",
         )
     }
 
@@ -129,5 +132,9 @@ class PrefsRepository(private val context: Context) {
             counts.add(q)
             p[Keys.TRENDING_SEARCHES] = counts
         }
+    }
+
+    suspend fun setDownloadFolder(folder: String) {
+        context.dataStore.edit { it[Keys.DOWNLOAD_FOLDER] = folder }
     }
 }

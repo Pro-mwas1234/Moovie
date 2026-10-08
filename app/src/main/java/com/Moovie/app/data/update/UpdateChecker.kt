@@ -163,6 +163,8 @@ class UpdateChecker {
                 }
                 kotlinx.coroutines.delay(1500L * (attempt + 1)) // back off before retrying
             }
+            // Clean up leftover .part so failed checks don't accumulate in cacheDir.
+            part.delete()
             DownloadResult(error = lastError ?: "Unknown error")
         }
 

@@ -168,6 +168,89 @@ fun SettingsScreen(nav: NavController) {
             }
         }
 
+        SettingGroup("Storage") {
+            val curFolder = p.downloadFolder
+            var showFolderDialog by remember { mutableStateOf(false) }
+            var folderInput by remember { mutableStateOf(curFolder) }
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        folderInput = curFolder
+                        showFolderDialog = true
+                    }
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Download folder", Modifier.weight(1f))
+                Text(
+                    if (curFolder.isBlank()) "App default (Movies/moovie)"
+                    else curFolder,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.width(4.dp))
+                Icon(
+                    Icons.Filled.ExpandMore,
+                    contentDescription = "Change download folder",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (showFolderDialog) {
+                AlertDialog(
+                    onDismissRequest = { showFolderDialog = false },
+                    title = { Text("Download folder") },
+                    text = {
+                        Column {
+                            Text(
+                                "Folder relative to app external storage, e.g. Movies/MyShows",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = folderInput,
+                                onValueChange = { folderInput = it },
+                                singleLine = true,
+                                placeholder = { Text("Movies/MyShows") },
+                                isError = folderInput.contains("..") || folderInput.startsWith("/") || folderInput.startsWith("\\"),
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                val v = folderInput.trim()
+                                val ok = v.isBlank() ||
+                                    (!v.contains("..") && !v.startsWith("/") && !v.startsWith("\\"))
+                                if (ok) {
+                                    scope.launch {
+                                        ServiceLocator.prefs.setDownloadFolder(v)
+                                        showFolderDialog = false
+                                    }
+                                }
+                            },
+                            enabled = folderInput.isBlank() ||
+                                (!folderInput.contains("..") && !folderInput.startsWith("/") && !folderInput.startsWith("\\")),
+                        ) { Text("Save") }
+                    },
+                    dismissButton = { TextButton(onClick = { showFolderDialog = false }) { Text("Cancel") } },
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = {
+                    scope.launch {
+                        val uid = ServiceLocator.auth.uid ?: return@launch
+                        val base = ServiceLocator.downloadManager.downloadDir()
+                        base.walkTopDown().filter { it.isFile }.forEach { it.delete() }
+                        ServiceLocator.downloads.removeWhere { true }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Clear downloaded videos") }
+        }
+
         SettingGroup("Account") {
             if (account != null && !account.isAnonymous) {
                 OutlinedButton(
