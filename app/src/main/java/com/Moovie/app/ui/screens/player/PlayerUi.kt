@@ -270,7 +270,7 @@ fun WebViewPlayer(url: String, reloadKey: Int = 0, modifier: Modifier = Modifier
                         override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                             val u = request?.url ?: return false
                             // Keep embed traffic inside; open external links in browser
-                            return !u.host.orEmpty().contains("vidstuck.xyz")
+                            return !u.host.orEmpty().contains("vidstuck.cc")
                         }
                     }
                     webChromeClient = object : WebChromeClient() {
