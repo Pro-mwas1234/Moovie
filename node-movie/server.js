@@ -4,9 +4,9 @@ const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch
 const app = express();
 const PORT = process.env.PORT || 8082;
 
-const UPSTREAM_REFERER = 'https://vidstuck.xyz/'; 
+const UPSTREAM_REFERER = 'https://vidstuck.cc/'; 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
-const ALLOWED_HOSTS = new Set(['vidstuck.xyz', 'sacdn.hakunaymatata.com']);
+const ALLOWED_HOSTS = new Set(['vidstuck.cc', 'sacdn.hakunaymatata.com']);
 const { spawn } = require('child_process');
 const path = require('path');
 
@@ -100,8 +100,8 @@ app.get('/resolve', async (req, res) => {
   if (!tid) return res.status(400).json({error: 'missing id'});
 
   const embed = media === 'movie'
-    ? `https://vidstuck.xyz/embed/movie/${tid}`
-    : `https://vidstuck.xyz/embed/tv/${tid}/${season}/${ep}`;
+    ? `https://vidstuck.cc/embed/movie/${tid}`
+    : `https://vidstuck.cc/embed/tv/${tid}/${season}/${ep}`;
 
   // Run extractor script
   const result = await new Promise((resolve, reject) => {

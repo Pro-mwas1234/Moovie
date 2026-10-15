@@ -56,7 +56,7 @@ import com.Moovie.app.data.remote.TmdbClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
-private const val EMBED_BASE = "https://vidstuck.xyz/embed"
+private const val EMBED_BASE = "https://vidstuck.cc/embed"
 
 fun embedUrl(mediaType: String, tmdbId: Int, season: Int = 1, episode: Int = 1): String =
     if (mediaType == "tv") {
