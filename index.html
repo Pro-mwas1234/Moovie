@@ -195,7 +195,7 @@
 
       var tag = release.tag_name || "latest";
       label.textContent =
-        "Download v" + tag + " · " + (apk.size / 1048576).toFixed(1) + " MB";
+        "Download " + tag + " · " + (apk.size / 1048576).toFixed(1) + " MB";
       meta.textContent = "Latest release: " + tag;
     })
     .catch(function () {
