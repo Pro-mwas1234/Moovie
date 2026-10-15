@@ -74,9 +74,18 @@ class UpdateChecker {
 
         runCatching {
             http.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) return@withContext null
+                if (!resp.isSuccessful) {
+                    val errBody = resp.body?.string() ?: "HTTP ${resp.code}"
+                    Log.w(TAG, "GitHub API error ${resp.code}: $errBody")
+                    return@withContext null
+                }
                 val body = resp.body?.string() ?: return@withContext null
-                val rel = json.fromJson(body, GhRelease::class.java)
+                val rel = runCatching { json.fromJson(body, GhRelease::class.java) }
+                    .onFailure { e ->
+                        Log.w(TAG, "Failed to parse GitHub release JSON: ${e.message}")
+                    }
+                    .getOrNull()
+                    ?: return@withContext null
                 val apk = rel.assets?.firstOrNull { it.name?.endsWith(".apk") == true }
                     ?: return@withContext null
                 val tag = rel.tagName ?: return@withContext null
@@ -90,6 +99,8 @@ class UpdateChecker {
                     publishedAt = rel.publishedAt,
                 )
             }
+        }.onFailure { e ->
+            Log.w(TAG, "Update check failed: ${e.message}")
         }.getOrNull()
     }
 
