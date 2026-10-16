@@ -51,7 +51,9 @@ import androidx.navigation.NavController
 import com.Moovie.app.ServiceLocator
 import com.Moovie.app.data.model.DownloadItem
 import com.Moovie.app.data.model.TmdbEpisode
+import com.Moovie.app.data.remote.Caption
 import com.Moovie.app.data.remote.OmniSaveClient
+import com.Moovie.app.data.remote.StreamQuality
 import com.Moovie.app.data.remote.TmdbClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -85,6 +87,24 @@ class PlayerViewModel(
 
     /** Direct MP4 URL resolved via OmniSave; null while resolving / on failure. */
     val directStream = MutableStateFlow<String?>(null)
+
+    /** All OmniSave qualities for the current title/episode (VIP-locked included). */
+    val qualities = MutableStateFlow<List<StreamQuality>>(emptyList())
+
+    /** Subtitle tracks offered by OmniSave for the current title/episode. */
+    val captions = MutableStateFlow<List<Caption>>(emptyList())
+
+    /** True while OmniSave is being queried (drives the waiting banner). */
+    val resolvingNative = MutableStateFlow(false)
+
+    /** URL of the quality currently selected in the OmniSave controls. */
+    val selectedQualityUrl = MutableStateFlow<String?>(null)
+
+    /** Chosen subtitle track, or null for "off". */
+    val selectedCaption = MutableStateFlow<Caption?>(null)
+
+    /** True when the current source is a downloaded local file (forces native). */
+    val playingLocalFile = MutableStateFlow(false)
 
     /** Key for the currently-playing movie or episode in the Downloads list. */
     private fun downloadKey(): String =
@@ -141,20 +161,76 @@ class PlayerViewModel(
             if (uid != null) ServiceLocator.downloads.findItem(uid, downloadKey()) else null
         }.getOrNull()
         if (local?.localPath != null && ServiceLocator.downloadFiles.exists(local.localPath)) {
+            playingLocalFile.value = true
             directStream.value = local.localPath
+            // Load subtitles from the downloaded item if available
+            val downloadItem = runCatching {
+                ServiceLocator.downloads.findItem(uid, downloadKey())
+            }.getOrNull() ?: return@runCatching
+            val subPath = downloadItem.subtitlePath
+            if (subPath != null && ServiceLocator.downloadFiles.exists(subPath)) {
+                captions.value = listOf(Caption(
+                    url = subPath,
+                    lanName = downloadItem.subtitleLang,
+                    lan = downloadItem.subtitleLang
+                ))
+            } else {
+                captions.value = emptyList()
+            }
+            selectedCaption.value = captions.value.isNotEmpty() ? captions.value.first() : null
+            qualities.value = emptyList()
             return
         }
+        playingLocalFile.value = false
         val name = titleName.value.takeIf { it.isNotBlank() } ?: return
-        directStream.value = if (mediaType == "tv") {
-            OmniSaveClient.resolveStream(
-                title = name,
-                season = currentSeason.value,
-                episode = currentEpisode.value,
-                preferTv = true,
-            )
-        } else {
-            OmniSaveClient.resolveStream(name)
+        val tv = mediaType == "tv"
+        resolvingNative.value = true
+        try {
+            val qs = runCatching {
+                if (tv) OmniSaveClient.resolveQualitiesDetailed(
+                    title = name,
+                    season = currentSeason.value,
+                    episode = currentEpisode.value,
+                    preferTv = true,
+                ) else OmniSaveClient.resolveQualitiesDetailed(name)
+            }.getOrDefault(emptyList())
+            val caps = runCatching {
+                if (tv) OmniSaveClient.resolveSubtitles(
+                    title = name,
+                    season = currentSeason.value,
+                    episode = currentEpisode.value,
+                    preferTv = true,
+                ) else OmniSaveClient.resolveSubtitles(name)
+            }.getOrDefault(emptyList())
+            qualities.value = qs
+            captions.value = caps
+            selectedCaption.value = null
+            val best = qs.filter { !it.vipLocked && it.url.isNotBlank() }.maxByOrNull { it.resolution }
+            directStream.value = best?.url
+            selectedQualityUrl.value = best?.url
+        } finally {
+            resolvingNative.value = false
         }
+    }
+
+    /** Switches the native OmniSave stream to another (non-VIP) quality. */
+    fun selectQuality(q: StreamQuality) {
+        if (q.vipLocked || q.url.isBlank()) return
+        selectedQualityUrl.value = q.url
+        directStream.value = q.url
+    }
+
+    /** Turns subtitles on (a specific track) or off (null). */
+    fun selectCaption(c: Caption?) {
+        selectedCaption.value = c
+    }
+
+    fun nextEpisode() {
+        setEpisode(currentEpisode.value + 1)
+    }
+
+    fun previousEpisode() {
+        if (currentEpisode.value > 1) setEpisode(currentEpisode.value - 1)
     }
 
     private fun refreshDownload() {

@@ -1,48 +1,76 @@
 package com.Moovie.app.ui.screens.player
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.material.icons.filled.Forward10
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
+import androidx.compose.material.icons.filled.HighQuality
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Replay10
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
-import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.DownloadDone
 import android.annotation.SuppressLint
+import android.net.Uri
 import android.view.WindowManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import com.Moovie.app.data.remote.Caption
+import com.Moovie.app.data.remote.StreamQuality
+
+/** Which playback source the user has chosen. */
+enum class PlaybackProvider { EMBED, OMNI_SAVE }
 
 @Composable
 fun PlayerScreen(nav: NavController, vm: PlayerViewModel) {
@@ -56,9 +84,17 @@ fun PlayerScreen(nav: NavController, vm: PlayerViewModel) {
     var reloadKey by remember { mutableStateOf(0) }
     val downloaded by vm.downloaded.collectAsState()
     val directStream by vm.directStream.collectAsState()
-    // Embed is the primary player; the native MP4 (OmniSave/ExoPlayer) is an
-    // explicit opt-in via the bolt toggle. A downloaded local file auto-switches.
-    var preferNative by remember { mutableStateOf(false) }
+    val qualities by vm.qualities.collectAsState()
+    val captions by vm.captions.collectAsState()
+    val resolvingNative by vm.resolvingNative.collectAsState()
+    val selectedQualityUrl by vm.selectedQualityUrl.collectAsState()
+    val selectedCaption by vm.selectedCaption.collectAsState()
+    val playingLocalFile by vm.playingLocalFile.collectAsState()
+
+    // OmniSave is now a first-class provider alongside the embed, for both
+    // movies and TV. A downloaded local file always forces the native player.
+    var provider by remember { mutableStateOf(PlaybackProvider.EMBED) }
+    val useNative = playingLocalFile || provider == PlaybackProvider.OMNI_SAVE
 
     val url = embedUrl(mediaType, vm.idForUi, currentSeason, currentEpisode)
 
@@ -70,8 +106,7 @@ fun PlayerScreen(nav: NavController, vm: PlayerViewModel) {
     }
 
     // Keep the screen on while the player is open (both embed and native).
-    // LocalContext.current is composable-only, so read it here (not in the effect).
-    val activity = androidx.compose.ui.platform.LocalContext.current.findActivity()
+    val activity = LocalContext.current.findActivity()
     androidx.compose.runtime.DisposableEffect(Unit) {
         activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         onDispose {
@@ -79,19 +114,19 @@ fun PlayerScreen(nav: NavController, vm: PlayerViewModel) {
         }
     }
 
-    Column(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black)) {
+    Column(Modifier.fillMaxSize().background(Color.Black)) {
         // Top bar
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
         ) {
             IconButton(onClick = { nav.popBackStack() }) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = androidx.compose.ui.graphics.Color.White)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White)
             }
             Column(Modifier.weight(1f)) {
                 Text(
                     titleName.ifBlank { "Now playing" },
-                    color = androidx.compose.ui.graphics.Color.White,
+                    color = Color.White,
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -99,7 +134,7 @@ fun PlayerScreen(nav: NavController, vm: PlayerViewModel) {
                 if (mediaType == "tv") {
                     Text(
                         "S$currentSeason · E$currentEpisode",
-                        color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f),
+                        color = Color.White.copy(alpha = 0.7f),
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }
@@ -109,48 +144,77 @@ fun PlayerScreen(nav: NavController, vm: PlayerViewModel) {
                 Icon(
                     if (downloaded) Icons.Filled.DownloadDone else Icons.Filled.Download,
                     contentDescription = if (downloaded) "Remove download" else "Save for offline",
-                    tint = if (downloaded) MaterialTheme.colorScheme.primary
-                    else androidx.compose.ui.graphics.Color.White,
+                    tint = if (downloaded) MaterialTheme.colorScheme.primary else Color.White,
                 )
-            }
-            // Toggle native MP4 (OmniSave) vs the embed.
-            if (directStream != null) {
-                IconButton(onClick = { preferNative = !preferNative }) {
-                    Icon(
-                        Icons.Filled.Bolt,
-                        contentDescription = if (preferNative) "Use embed player" else "Use native player",
-                        tint = if (preferNative) MaterialTheme.colorScheme.primary
-                        else androidx.compose.ui.graphics.Color.White,
-                    )
-                }
             }
             if (mediaType == "tv") {
                 IconButton(onClick = { showEpisodes = true }) {
-                    Icon(Icons.Filled.Tune, "Episodes", tint = androidx.compose.ui.graphics.Color.White)
+                    Icon(Icons.Filled.Tune, "Episodes", tint = Color.White)
                 }
             }
         }
 
-        // Player: a downloaded file (content:// MediaStore URI or /file/path)
-        // always wins over the online embed and plays natively; an http(s)
-        // directStream is a resolved OmniSave stream, switchable via the bolt.
+        // Provider switch — Embed (vidstuck) vs the native OmniSave stream.
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+        ) {
+            Text(
+                "Source",
+                color = Color.White.copy(alpha = 0.6f),
+                style = MaterialTheme.typography.labelSmall,
+            )
+            ProviderChip(
+                label = "Embed",
+                selected = !useNative,
+                enabled = !playingLocalFile,
+                onClick = { provider = PlaybackProvider.EMBED },
+            )
+            ProviderChip(
+                label = if (resolvingNative) "OmniSave…" else "OmniSave",
+                selected = useNative,
+                enabled = true,
+                onClick = { provider = PlaybackProvider.OMNI_SAVE },
+            )
+            if (playingLocalFile) {
+                Text(
+                    "offline",
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            }
+        }
+
+        // Player area.
         val stream = directStream
         val isLocalFile = stream != null && !stream.startsWith("http")
-        if (stream != null && (preferNative || isLocalFile)) {
-            Column(Modifier.fillMaxWidth().weight(1f)) {
-                ExoPlayerScreen(
+        if (useNative) {
+            if (stream != null) {
+                OmniSavePlayer(
                     url = stream,
-                    modifier = Modifier.fillMaxSize(),
+                    qualities = qualities,
+                    selectedQualityUrl = selectedQualityUrl,
+                    onSelectQuality = { vm.selectQuality(it) },
+                    captions = captions,
+                    selectedCaption = selectedCaption,
+                    onSelectCaption = { vm.selectCaption(it) },
+                    isTv = mediaType == "tv",
+                    hasPreviousEpisode = currentEpisode > 1,
+                    onPreviousEpisode = { vm.previousEpisode() },
+                    onNextEpisode = { vm.nextEpisode() },
                     onPosition = { vm.reportPosition(it) },
+                    modifier = Modifier.fillMaxWidth().weight(1f),
                 )
-                if (!isLocalFile) {
-                    Text(
-                        "Native stream (OmniSave) — tap the bolt icon to switch back to embed",
-                        color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.6f),
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                    )
-                }
+            } else {
+                MoovieWaitingBanner(
+                    text = when {
+                        resolvingNative -> "Preparing OmniSave stream…"
+                        isLocalFile -> "Loading downloaded file…"
+                        else -> "No OmniSave source found — switch to Embed."
+                    },
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                )
             }
         } else {
             WebViewPlayer(
@@ -169,7 +233,7 @@ fun PlayerScreen(nav: NavController, vm: PlayerViewModel) {
                     FilterChip(
                         selected = s == currentSeason,
                         onClick = { vm.setSeason(s); reloadKey++ },
-                        label = { Text("S$s", color = androidx.compose.ui.graphics.Color.White) },
+                        label = { Text("S$s", color = Color.White) },
                         modifier = Modifier.padding(horizontal = 4.dp),
                     )
                 }
@@ -209,6 +273,17 @@ fun PlayerScreen(nav: NavController, vm: PlayerViewModel) {
     }
 }
 
+/** Small chip used for the Embed/OmniSave provider switch. */
+@Composable
+private fun ProviderChip(label: String, selected: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    FilterChip(
+        selected = selected,
+        enabled = enabled,
+        onClick = onClick,
+        label = { Text(label, color = Color.White) },
+    )
+}
+
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun WebViewPlayer(url: String, reloadKey: Int = 0, modifier: Modifier = Modifier) {
@@ -222,7 +297,7 @@ fun WebViewPlayer(url: String, reloadKey: Int = 0, modifier: Modifier = Modifier
     var isFullscreen by remember { mutableStateOf(false) }
     var decorParent by remember { mutableStateOf<android.view.ViewGroup?>(null) }
 
-    val activity = androidx.compose.ui.platform.LocalContext.current.findActivity()
+    val activity = LocalContext.current.findActivity()
 
     // Attach/detach the custom view on the decor view, sized to fill the screen.
     androidx.compose.runtime.DisposableEffect(customView) {
@@ -275,8 +350,6 @@ fun WebViewPlayer(url: String, reloadKey: Int = 0, modifier: Modifier = Modifier
                     }
                     webChromeClient = object : WebChromeClient() {
                         override fun onShowCustomView(view: android.view.View, callback: android.webkit.WebChromeClient.CustomViewCallback) {
-                            // Remember the decor content view so the overlay effect
-                            // can attach the fullscreen view above everything.
                             decorParent = activity?.window?.decorView as? android.view.ViewGroup
                             customView = view
                             isFullscreen = true
@@ -300,6 +373,392 @@ fun WebViewPlayer(url: String, reloadKey: Int = 0, modifier: Modifier = Modifier
     }
 }
 
+/**
+ * Native OmniSave player: ExoPlayer (media3) with a custom Compose control
+ * layer instead of the default PlayerView controller.
+ *
+ * Controls: play/pause, seek bar + time, ±10s, playback speed, quality picker,
+ * subtitle picker, fullscreen (rotate), and TV episode prev/next. A branded
+ * "Moovie" banner is shown while the stream is buffering/preparing.
+ */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+@Composable
+fun OmniSavePlayer(
+    url: String,
+    qualities: List<StreamQuality>,
+    selectedQualityUrl: String?,
+    onSelectQuality: (StreamQuality) -> Unit,
+    captions: List<Caption>,
+    selectedCaption: Caption?,
+    onSelectCaption: (Caption?) -> Unit,
+    isTv: Boolean,
+    hasPreviousEpisode: Boolean,
+    onPreviousEpisode: () -> Unit,
+    onNextEpisode: () -> Unit,
+    onPosition: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val activity = context.findActivity()
+
+    val dsFactory = remember {
+        androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(
+            okhttp3.OkHttpClient.Builder().build()
+        ).apply {
+            setUserAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150 Mobile Safari/537.36")
+            setDefaultRequestProperties(mapOf("referer" to "https://videodownloader.site/"))
+        }
+    }
+
+    val player = remember {
+        androidx.media3.exoplayer.ExoPlayer.Builder(context)
+            .setMediaSourceFactory(
+                androidx.media3.exoplayer.source.DefaultMediaSourceFactory(
+                    androidx.media3.datasource.DefaultDataSource.Factory(context, dsFactory)
+                )
+            )
+            .build()
+    }
+
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        onDispose { player.release() }
+    }
+
+    var isPlaying by remember { mutableStateOf(false) }
+    var buffering by remember { mutableStateOf(true) }
+    var positionMs by remember { mutableLongStateOf(0L) }
+    var durationMs by remember { mutableLongStateOf(0L) }
+    var speed by remember { mutableFloatStateOf(1f) }
+    var showControls by remember { mutableStateOf(true) }
+    var fullscreen by remember { mutableStateOf(false) }
+
+    val subtitleUri = remember(selectedCaption) {
+        selectedCaption?.url?.takeIf { it.isNotBlank() }?.let { Uri.parse(it) }
+    }
+
+    // (Re)load whenever the stream URL or subtitle track changes.
+    androidx.compose.runtime.LaunchedEffect(url, subtitleUri) {
+        val subConfigs = subtitleUri?.let { u ->
+            listOf(
+                androidx.media3.common.MediaItem.SubtitleConfiguration.Builder(u)
+                    .setMimeType(mimeForSubtitle(u.toString()))
+                    .build()
+            )
+        } ?: emptyList()
+        val item = androidx.media3.common.MediaItem.Builder()
+            .setUri(if (url.startsWith("/")) Uri.fromFile(java.io.File(url)) else Uri.parse(url))
+            .setSubtitleConfigurations(subConfigs)
+            .build()
+        player.setMediaItem(item)
+        player.prepare()
+        player.playWhenReady = true
+    }
+
+    androidx.compose.runtime.DisposableEffect(player) {
+        val listener = object : androidx.media3.common.Player.Listener {
+            override fun onIsPlayingChanged(playing: Boolean) {
+                isPlaying = playing
+            }
+
+            override fun onPlaybackStateChanged(state: Int) {
+                buffering = state == androidx.media3.common.Player.STATE_BUFFERING ||
+                    state == androidx.media3.common.Player.STATE_IDLE
+                if (state == androidx.media3.common.Player.STATE_READY) {
+                    durationMs = player.duration.coerceAtLeast(0L)
+                }
+            }
+        }
+        player.addListener(listener)
+        onDispose { player.removeListener(listener) }
+    }
+
+    // Pause/release with lifecycle to avoid playing in the background.
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) player.pause()
+        }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+    }
+
+    // Rotate for fullscreen and restore on exit.
+    androidx.compose.runtime.DisposableEffect(fullscreen) {
+        if (fullscreen && activity != null) {
+            val old = activity.requestedOrientation
+            activity.requestedOrientation =
+                android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            onDispose { activity.requestedOrientation = old }
+        } else {
+            onDispose { }
+        }
+    }
+
+    // Position/duration polling for the seek bar, and progress reporting.
+    androidx.compose.runtime.LaunchedEffect(player) {
+        while (true) {
+            positionMs = player.currentPosition.coerceAtLeast(0L)
+            val d = player.duration
+            if (d > 0) durationMs = d
+            if (player.playWhenReady) onPosition(positionMs / 1000)
+            kotlinx.coroutines.delay(500)
+        }
+    }
+
+    Box(modifier.background(Color.Black)) {
+        AndroidView(
+            modifier = Modifier.fillMaxSize().clickable { showControls = !showControls },
+            factory = { ctx ->
+                androidx.media3.ui.PlayerView(ctx).apply {
+                    layoutParams = android.view.ViewGroup.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    )
+                    useController = false
+                    this.player = player
+                    setBackgroundColor(android.graphics.Color.BLACK)
+                }
+            },
+            onRelease = { },
+        )
+
+        if (buffering) {
+            MoovieWaitingBanner(
+                text = "Buffering from OmniSave…",
+                modifier = Modifier.fillMaxSize(),
+                compact = true,
+            )
+        }
+
+        if (showControls) {
+            OmniSaveControls(
+                isPlaying = isPlaying,
+                positionMs = positionMs,
+                durationMs = durationMs,
+                speed = speed,
+                isTv = isTv,
+                hasPreviousEpisode = hasPreviousEpisode,
+                qualities = qualities,
+                selectedQualityUrl = selectedQualityUrl,
+                captions = captions,
+                selectedCaption = selectedCaption,
+                fullscreen = fullscreen,
+                onPlayPause = { if (player.isPlaying) player.pause() else player.play() },
+                onSeek = { ms -> player.seekTo(ms) },
+                onSkip = { delta -> player.seekTo((player.currentPosition + delta).coerceAtLeast(0L)) },
+                onSpeed = { s -> speed = s; player.setPlaybackSpeed(s) },
+                onQuality = onSelectQuality,
+                onCaption = onSelectCaption,
+                onPreviousEpisode = onPreviousEpisode,
+                onNextEpisode = onNextEpisode,
+                onFullscreen = { fullscreen = !fullscreen },
+            )
+        }
+    }
+}
+
+@Composable
+private fun OmniSaveControls(
+    isPlaying: Boolean,
+    positionMs: Long,
+    durationMs: Long,
+    speed: Float,
+    isTv: Boolean,
+    hasPreviousEpisode: Boolean,
+    qualities: List<StreamQuality>,
+    selectedQualityUrl: String?,
+    captions: List<Caption>,
+    selectedCaption: Caption?,
+    fullscreen: Boolean,
+    onPlayPause: () -> Unit,
+    onSeek: (Long) -> Unit,
+    onSkip: (Long) -> Unit,
+    onSpeed: (Float) -> Unit,
+    onQuality: (StreamQuality) -> Unit,
+    onCaption: (Caption?) -> Unit,
+    onPreviousEpisode: () -> Unit,
+    onNextEpisode: () -> Unit,
+    onFullscreen: () -> Unit,
+) {
+    var speedMenu by remember { mutableStateOf(false) }
+    var qualityMenu by remember { mutableStateOf(false) }
+    var subsMenu by remember { mutableStateOf(false) }
+    var dragging by remember { mutableStateOf(false) }
+    var dragValue by remember { mutableFloatStateOf(0f) }
+
+    val selectableQualities = qualities.filter { !it.vipLocked && it.url.isNotBlank() }
+    val sliderValue = if (dragging) dragValue else positionMs.toFloat()
+    val rangeEnd = durationMs.coerceAtLeast(1L).toFloat()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.38f))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.Bottom,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (isTv && hasPreviousEpisode) {
+                IconButton(onClick = onPreviousEpisode) {
+                    Icon(Icons.Filled.SkipPrevious, "Previous episode", tint = Color.White, modifier = Modifier.size(32.dp))
+                }
+            }
+            IconButton(onClick = { onSkip(-10_000L) }) {
+                Icon(Icons.Filled.Replay10, "Back 10 seconds", tint = Color.White, modifier = Modifier.size(32.dp))
+            }
+            IconButton(onClick = onPlayPause) {
+                Icon(
+                    if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    if (isPlaying) "Pause" else "Play",
+                    tint = Color.White,
+                    modifier = Modifier.size(48.dp),
+                )
+            }
+            IconButton(onClick = { onSkip(10_000L) }) {
+                Icon(Icons.Filled.Forward10, "Forward 10 seconds", tint = Color.White, modifier = Modifier.size(32.dp))
+            }
+            if (isTv) {
+                IconButton(onClick = onNextEpisode) {
+                    Icon(Icons.Filled.SkipNext, "Next episode", tint = Color.White, modifier = Modifier.size(32.dp))
+                }
+            }
+        }
+
+        Spacer(Modifier.height(4.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(formatTime(positionMs), color = Color.White, style = MaterialTheme.typography.labelSmall)
+            Slider(
+                value = sliderValue.coerceIn(0f, rangeEnd),
+                onValueChange = { dragging = true; dragValue = it },
+                onValueChangeFinished = {
+                    onSeek(dragValue.toLong())
+                    dragging = false
+                },
+                valueRange = 0f..rangeEnd,
+                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+            )
+            Text(formatTime(durationMs), color = Color.White, style = MaterialTheme.typography.labelSmall)
+        }
+
+        Spacer(Modifier.height(4.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Playback speed
+            Box {
+                IconButton(onClick = { speedMenu = true }) {
+                    Icon(Icons.Filled.Speed, "Playback speed", tint = Color.White)
+                }
+                DropdownMenu(expanded = speedMenu, onDismissRequest = { speedMenu = false }) {
+                    listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f).forEach { s ->
+                        DropdownMenuItem(
+                            text = { Text(if (s == 1f) "Normal" else "${s}×") },
+                            onClick = { onSpeed(s); speedMenu = false },
+                        )
+                    }
+                }
+            }
+
+            // Quality
+            Box {
+                IconButton(onClick = { qualityMenu = true }, enabled = selectableQualities.isNotEmpty()) {
+                    Icon(
+                        Icons.Filled.HighQuality,
+                        "Quality",
+                        tint = if (selectableQualities.isEmpty()) Color.White.copy(alpha = 0.4f) else Color.White,
+                    )
+                }
+                DropdownMenu(expanded = qualityMenu, onDismissRequest = { qualityMenu = false }) {
+                    if (selectableQualities.isEmpty()) {
+                        DropdownMenuItem(text = { Text("No qualities") }, onClick = { qualityMenu = false })
+                    }
+                    selectableQualities.forEach { q ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    "${q.resolution}p · ${q.format}" +
+                                        if (q.url == selectedQualityUrl) "  ✓" else "",
+                                )
+                            },
+                            onClick = { onQuality(q); qualityMenu = false },
+                        )
+                    }
+                }
+            }
+
+            // Subtitles
+            Box {
+                IconButton(onClick = { subsMenu = true }) {
+                    Icon(
+                        Icons.Filled.Subtitles,
+                        "Subtitles",
+                        tint = if (selectedCaption != null) MaterialTheme.colorScheme.primary else Color.White,
+                    )
+                }
+                DropdownMenu(expanded = subsMenu, onDismissRequest = { subsMenu = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Off" + if (selectedCaption == null) "  ✓" else "") },
+                        onClick = { onCaption(null); subsMenu = false },
+                    )
+                    captions.forEach { c ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    (c.lanName ?: c.lan ?: "Unknown") +
+                                        if (c.url == selectedCaption?.url) "  ✓" else "",
+                                )
+                            },
+                            onClick = { onCaption(c); subsMenu = false },
+                        )
+                    }
+                    if (captions.isEmpty()) {
+                        DropdownMenuItem(text = { Text("No subtitles") }, onClick = { subsMenu = false })
+                    }
+                }
+            }
+
+            // Fullscreen
+            IconButton(onClick = onFullscreen) {
+                Icon(
+                    if (fullscreen) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
+                    if (fullscreen) "Exit fullscreen" else "Fullscreen",
+                    tint = Color.White,
+                )
+            }
+        }
+    }
+}
+
+/** Branded loading banner shown while a source is resolving/buffering. */
+@Composable
+private fun MoovieWaitingBanner(text: String, modifier: Modifier = Modifier, compact: Boolean = false) {
+    Box(modifier.background(Color.Black.copy(alpha = if (compact) 0.55f else 1f)), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                "Moovie",
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(Modifier.height(12.dp))
+            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, strokeWidth = 3.dp)
+            Spacer(Modifier.height(8.dp))
+            Text(text, color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
 /** Extracts the hosting Activity from any Context chain, or null. */
 private tailrec fun android.content.Context.findActivity(): android.app.Activity? =
     when (this) {
@@ -308,81 +767,15 @@ private tailrec fun android.content.Context.findActivity(): android.app.Activity
         else -> null
     }
 
-/**
- * Native player for direct MP4 streams resolved via OmniSave.
- * Uses ExoPlayer (media3) with an OkHttp datasource so the same user-agent /
- * referer headers the CDN expects are sent.
- */
-@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
-@Composable
-private fun ExoPlayerScreen(url: String, modifier: Modifier = Modifier, onPosition: (Long) -> Unit = {}) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-
-    val player = remember(url) {
-        val dsFactory = androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(
-            okhttp3.OkHttpClient.Builder().build()
-        ).apply {
-            setUserAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150 Mobile Safari/537.36")
-            setDefaultRequestProperties(mapOf("referer" to "https://videodownloader.site/"))
-        }
-        androidx.media3.exoplayer.ExoPlayer.Builder(context)
-            .setMediaSourceFactory(
-                androidx.media3.exoplayer.source.DefaultMediaSourceFactory(
-                    androidx.media3.datasource.DefaultDataSource.Factory(context, dsFactory)
-                )
-            )
-            .build()
-            .apply {
-                // Downloaded files arrive as content:// (MediaStore) or as a
-                // bare file path; only bare paths get the file:// scheme.
-                val uri = if (url.startsWith("/")) android.net.Uri.fromFile(java.io.File(url))
-                    else android.net.Uri.parse(url)
-                setMediaItem(androidx.media3.common.MediaItem.fromUri(uri))
-                prepare()
-                playWhenReady = true
-            }
-    }
-
-    // Pause/release with lifecycle to avoid playing in the background.
-    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
-        val obs = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            when (event) {
-                androidx.lifecycle.Lifecycle.Event.ON_STOP -> player.pause()
-                else -> {}
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(obs)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(obs)
-            player.release()
-        }
-    }
-
-    // Periodically report the playback position so Continue Watching can
-    // resume here and draw a progress bar on Home.
-    androidx.compose.runtime.LaunchedEffect(player) {
-        while (true) {
-            if (player.playWhenReady && player.playbackState != androidx.media3.common.Player.STATE_ENDED) {
-                onPosition(player.currentPosition / 1000)
-            }
-            kotlinx.coroutines.delay(5_000)
-        }
-    }
-
-    AndroidView(
-        modifier = modifier,
-        factory = { ctx ->
-            androidx.media3.ui.PlayerView(ctx).apply {
-                layoutParams = android.view.ViewGroup.LayoutParams(
-                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                )
-                useController = true
-                this.player = player
-                setBackgroundColor(android.graphics.Color.BLACK)
-            }
-        },
-        onRelease = { },
-    )
+/** mm:ss (or h:mm:ss) for the seek bar. */
+private fun formatTime(ms: Long): String {
+    val totalSeconds = (ms / 1000).coerceAtLeast(0L)
+    val h = totalSeconds / 3600
+    val m = (totalSeconds % 3600) / 60
+    val s = totalSeconds % 60
+    return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
 }
+
+/** Best-guess subtitle MIME from the URL extension. */
+private fun mimeForSubtitle(url: String): String =
+    if (url.lowercase().contains(".vtt")) "text/vtt" else "application/x-subrip"

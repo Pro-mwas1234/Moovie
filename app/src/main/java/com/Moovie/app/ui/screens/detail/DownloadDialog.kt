@@ -272,17 +272,19 @@ fun DownloadDialog(
                                 style = MaterialTheme.typography.titleSmall,
                             )
                             Spacer(Modifier.height(4.dp))
-                            SubtitleRow(
-                                label = "None",
-                                selected = selectedSubtitle == null,
-                                onPick = { vm.selectedSubtitle.value = null },
-                            )
-                            subtitles.forEach { sub ->
+                            LazyColumn(modifier = Modifier.fillMaxWidth()) {
                                 SubtitleRow(
-                                    label = sub.lanName ?: sub.lan ?: "Unknown",
-                                    selected = selectedSubtitle?.url == sub.url,
-                                    onPick = { vm.selectedSubtitle.value = sub },
+                                    label = "None",
+                                    selected = selectedSubtitle == null,
+                                    onPick = { vm.selectedSubtitle.value = null },
                                 )
+                                subtitles.forEach { sub ->
+                                    SubtitleRow(
+                                        label = sub.lanName ?: sub.lan ?: "Unknown",
+                                        selected = selectedSubtitle?.url == sub.url,
+                                        onPick = { vm.selectedSubtitle.value = sub },
+                                    )
+                                }
                             }
                             Spacer(Modifier.height(8.dp))
                             HorizontalDivider()
@@ -400,17 +402,19 @@ fun EpisodeDownloadDialog(
                                 style = MaterialTheme.typography.titleSmall,
                             )
                             Spacer(Modifier.height(4.dp))
-                            SubtitleRow(
-                                label = "None",
-                                selected = selectedSubtitle == null,
-                                onPick = { vm.selectedSubtitle.value = null },
-                            )
-                            subtitles.forEach { sub ->
+                            LazyColumn(modifier = Modifier.fillMaxWidth()) {
                                 SubtitleRow(
-                                    label = sub.lanName ?: sub.lan ?: "Unknown",
-                                    selected = selectedSubtitle?.url == sub.url,
-                                    onPick = { vm.selectedSubtitle.value = sub },
+                                    label = "None",
+                                    selected = selectedSubtitle == null,
+                                    onPick = { vm.selectedSubtitle.value = null },
                                 )
+                                subtitles.forEach { sub ->
+                                    SubtitleRow(
+                                        label = sub.lanName ?: sub.lan ?: "Unknown",
+                                        selected = selectedSubtitle?.url == sub.url,
+                                        onPick = { vm.selectedSubtitle.value = sub },
+                                    )
+                                }
                             }
                             Spacer(Modifier.height(8.dp))
                             HorizontalDivider()
