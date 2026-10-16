@@ -156,8 +156,8 @@ class PlayerViewModel(
      * MP4. Called on init and whenever the episode changes.
      */
     private suspend fun resolveDirectStream() {
+        val uid = ServiceLocator.auth.ensureUid()
         val local = runCatching {
-            val uid = ServiceLocator.auth.ensureUid()
             if (uid != null) ServiceLocator.downloads.findItem(uid, downloadKey()) else null
         }.getOrNull()
         if (local?.localPath != null && ServiceLocator.downloadFiles.exists(local.localPath)) {
@@ -165,8 +165,8 @@ class PlayerViewModel(
             directStream.value = local.localPath
             // Load subtitles from the downloaded item if available
             val downloadItem = runCatching {
-                ServiceLocator.downloads.findItem(uid, downloadKey())
-            }.getOrNull() ?: return@runCatching
+                if (uid != null) ServiceLocator.downloads.findItem(uid, downloadKey()) else null
+            }.getOrNull() ?: return
             val subPath = downloadItem.subtitlePath
             if (subPath != null && ServiceLocator.downloadFiles.exists(subPath)) {
                 captions.value = listOf(Caption(
@@ -177,7 +177,7 @@ class PlayerViewModel(
             } else {
                 captions.value = emptyList()
             }
-            selectedCaption.value = captions.value.isNotEmpty() ? captions.value.first() : null
+            selectedCaption.value = if (captions.value.isNotEmpty()) captions.value.first() else null
             qualities.value = emptyList()
             return
         }
