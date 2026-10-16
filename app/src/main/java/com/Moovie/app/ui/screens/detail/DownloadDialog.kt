@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.CircularProgressIndicator
@@ -274,12 +275,14 @@ fun DownloadDialog(
                             )
                             Spacer(Modifier.height(4.dp))
                             LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                                SubtitleRow(
-                                    label = "None",
-                                    selected = selectedSubtitle == null,
-                                    onPick = { vm.selectedSubtitle.value = null },
-                                )
-                                subtitles.forEach { sub ->
+                                item {
+                                    SubtitleRow(
+                                        label = "None",
+                                        selected = selectedSubtitle == null,
+                                        onPick = { vm.selectedSubtitle.value = null },
+                                    )
+                                }
+                                items(subtitles) { sub ->
                                     SubtitleRow(
                                         label = sub.lanName ?: sub.lan ?: "Unknown",
                                         selected = selectedSubtitle?.url == sub.url,
@@ -404,12 +407,14 @@ fun EpisodeDownloadDialog(
                             )
                             Spacer(Modifier.height(4.dp))
                             LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                                SubtitleRow(
-                                    label = "None",
-                                    selected = selectedSubtitle == null,
-                                    onPick = { vm.selectedSubtitle.value = null },
-                                )
-                                subtitles.forEach { sub ->
+                                item {
+                                    SubtitleRow(
+                                        label = "None",
+                                        selected = selectedSubtitle == null,
+                                        onPick = { vm.selectedSubtitle.value = null },
+                                    )
+                                }
+                                items(subtitles) { sub ->
                                     SubtitleRow(
                                         label = sub.lanName ?: sub.lan ?: "Unknown",
                                         selected = selectedSubtitle?.url == sub.url,
