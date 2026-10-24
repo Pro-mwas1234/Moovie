@@ -39,10 +39,16 @@ class DownloadManager(private val context: Context) {
     /**
      * Starts a download. Pass [url] (from the quality picker) to skip automatic
      * resolution; otherwise the best available quality is resolved by title.
-     * Pass [subtitleUrl] to download a subtitle track alongside the video.
+     * Pass [subtitleUrl]/[subtitleLang] to download a subtitle track alongside
+     * the video and remember which language it is.
      * Self-heals a missing auth session via ensureUid instead of silently no-oping.
      */
-    fun enqueue(item: DownloadItem, url: String? = null, subtitleUrl: String? = null) {
+    fun enqueue(
+        item: DownloadItem,
+        url: String? = null,
+        subtitleUrl: String? = null,
+        subtitleLang: String? = null,
+    ) {
         val key = item.key
         if (jobs.containsKey(key)) return
         active.value = active.value + key
@@ -93,7 +99,7 @@ class DownloadManager(private val context: Context) {
                 var subtitlePath: String? = null
                 if (!subtitleUrl.isNullOrBlank()) {
                     runCatching {
-                        val subDest = subtitleFileFor(item)
+                        val subDest = subtitleFileFor(item, subtitleUrl)
                         downloadTo(subtitleUrl, subDest) { } // no progress for subtitles
                         subtitlePath = subDest.absolutePath
                     }
@@ -112,9 +118,11 @@ class DownloadManager(private val context: Context) {
                         progressPercent = 100,
                         localPath = playbackPath,
                         subtitlePath = subtitlePath,
-                        subtitleLang = subtitlePath?.let { sub ->
-                            item.titleName.substringBefore(" · S").substringBefore(" — ")
-                        },
+                        subtitleLang = subtitleLang
+                            ?.takeIf { subtitlePath != null && it.isNotBlank() }
+                            ?: subtitlePath?.let {
+                                item.titleName.substringBefore(" · S").substringBefore(" — ")
+                            },
                     )
                 }
                 if (playbackPath != dest.absolutePath) dest.delete()
@@ -198,11 +206,19 @@ class DownloadManager(private val context: Context) {
         return File(dir, "$safe$se.${item.key.hashCode().toUInt()}.mp4")
     }
 
-    private suspend fun subtitleFileFor(item: DownloadItem): File {
+    private suspend fun subtitleFileFor(item: DownloadItem, subtitleUrl: String): File {
         val dir = downloadDir()
         val safe = item.titleName.replace(Regex("[<>:\"/\\\\|?*]"), "").trim().take(80).ifBlank { item.key }
         val se = item.season?.let { s -> item.episode?.let { e -> ".S$s.E$e" } } ?: ""
-        return File(dir, "$safe$se.${item.key.hashCode().toUInt()}.srt")
+        // Keep the real subtitle format: the player picks its decoder from the
+        // file extension, so saving a WebVTT track as .srt breaks captions.
+        val path = subtitleUrl.substringBefore('?').lowercase()
+        val ext = when {
+            path.endsWith(".vtt") -> "vtt"
+            path.endsWith(".ass") || path.endsWith(".ssa") -> "ass"
+            else -> "srt"
+        }
+        return File(dir, "$safe$se.${item.key.hashCode().toUInt()}.$ext")
     }
 
     private suspend fun downloadTo(url: String, dest: File, onProgress: suspend (Int) -> Unit) =

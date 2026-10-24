@@ -50,14 +50,20 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.activity.compose.BackHandler
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import android.annotation.SuppressLint
 import android.net.Uri
@@ -68,6 +74,9 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import com.Moovie.app.data.remote.Caption
 import com.Moovie.app.data.remote.StreamQuality
+import com.Moovie.app.ui.screens.detail.DownloadDialog
+import com.Moovie.app.ui.screens.detail.DownloadViewModel
+import com.Moovie.app.ui.screens.detail.EpisodeDownloadDialog
 
 /** Which playback source the user has chosen. */
 enum class PlaybackProvider { EMBED, OMNI_SAVE }
@@ -82,7 +91,11 @@ fun PlayerScreen(nav: NavController, vm: PlayerViewModel) {
     val episodes by vm.episodes.collectAsState()
     var showEpisodes by remember { mutableStateOf(false) }
     var reloadKey by remember { mutableStateOf(0) }
+    var fullscreen by remember { mutableStateOf(false) }
+    var showDownloadPicker by remember { mutableStateOf(false) }
     val downloaded by vm.downloaded.collectAsState()
+    val posterPath by vm.posterPath.collectAsState()
+    val year by vm.year.collectAsState()
     val directStream by vm.directStream.collectAsState()
     val qualities by vm.qualities.collectAsState()
     val captions by vm.captions.collectAsState()
@@ -95,6 +108,11 @@ fun PlayerScreen(nav: NavController, vm: PlayerViewModel) {
     // movies and TV. A downloaded local file always forces the native player.
     var provider by remember { mutableStateOf(PlaybackProvider.EMBED) }
     val useNative = playingLocalFile || provider == PlaybackProvider.OMNI_SAVE
+
+    // Fullscreen only applies to the native player; switching back to the
+    // embed must restore the normal layout.
+    val isFullscreen = fullscreen && useNative
+    BackHandler(enabled = isFullscreen) { fullscreen = false }
 
     val url = embedUrl(mediaType, vm.idForUi, currentSeason, currentEpisode)
 
@@ -115,74 +133,84 @@ fun PlayerScreen(nav: NavController, vm: PlayerViewModel) {
     }
 
     Column(Modifier.fillMaxSize().background(Color.Black)) {
-        // Top bar
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
-        ) {
-            IconButton(onClick = { nav.popBackStack() }) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White)
-            }
-            Column(Modifier.weight(1f)) {
-                Text(
-                    titleName.ifBlank { "Now playing" },
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (mediaType == "tv") {
+        // In fullscreen the player is the only thing on screen; chrome is hidden
+        // so the video can use the whole display instead of a middle strip.
+        if (!isFullscreen) {
+            // Top bar
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
+            ) {
+                IconButton(onClick = { nav.popBackStack() }) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White)
+                }
+                Column(Modifier.weight(1f)) {
                     Text(
-                        "S$currentSeason · E$currentEpisode",
-                        color = Color.White.copy(alpha = 0.7f),
+                        titleName.ifBlank { "Now playing" },
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (mediaType == "tv") {
+                        Text(
+                            "S$currentSeason · E$currentEpisode",
+                            color = Color.White.copy(alpha = 0.7f),
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
+                }
+                // Downloaded items are removed straight away; otherwise ask for
+                // quality + subtitle before starting the transfer.
+                IconButton(onClick = {
+                    if (downloaded) vm.toggleDownload() else showDownloadPicker = true
+                }) {
+                    Icon(
+                        if (downloaded) Icons.Filled.DownloadDone else Icons.Filled.Download,
+                        contentDescription = if (downloaded) "Remove download" else "Save for offline",
+                        tint = if (downloaded) MaterialTheme.colorScheme.primary else Color.White,
+                    )
+                }
+                if (mediaType == "tv") {
+                    IconButton(onClick = { showEpisodes = true }) {
+                        Icon(Icons.Filled.Tune, "Episodes", tint = Color.White)
+                    }
+                }
+            }
+
+            // Provider switch — Embed (vidstuck) vs the native OmniSave stream.
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+            ) {
+                Text(
+                    "Source",
+                    color = Color.White.copy(alpha = 0.6f),
+                    style = MaterialTheme.typography.labelSmall,
+                )
+                ProviderChip(
+                    label = "Embed",
+                    selected = !useNative,
+                    enabled = !playingLocalFile,
+                    onClick = {
+                        provider = PlaybackProvider.EMBED
+                        fullscreen = false
+                    },
+                )
+                ProviderChip(
+                    label = if (resolvingNative) "OmniSave…" else "OmniSave",
+                    selected = useNative,
+                    enabled = true,
+                    onClick = { provider = PlaybackProvider.OMNI_SAVE },
+                )
+                if (playingLocalFile) {
+                    Text(
+                        "offline",
+                        color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }
-            }
-            // Saves/removes the current movie or episode in the in-app Downloads list.
-            IconButton(onClick = { vm.toggleDownload() }) {
-                Icon(
-                    if (downloaded) Icons.Filled.DownloadDone else Icons.Filled.Download,
-                    contentDescription = if (downloaded) "Remove download" else "Save for offline",
-                    tint = if (downloaded) MaterialTheme.colorScheme.primary else Color.White,
-                )
-            }
-            if (mediaType == "tv") {
-                IconButton(onClick = { showEpisodes = true }) {
-                    Icon(Icons.Filled.Tune, "Episodes", tint = Color.White)
-                }
-            }
-        }
-
-        // Provider switch — Embed (vidstuck) vs the native OmniSave stream.
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-        ) {
-            Text(
-                "Source",
-                color = Color.White.copy(alpha = 0.6f),
-                style = MaterialTheme.typography.labelSmall,
-            )
-            ProviderChip(
-                label = "Embed",
-                selected = !useNative,
-                enabled = !playingLocalFile,
-                onClick = { provider = PlaybackProvider.EMBED },
-            )
-            ProviderChip(
-                label = if (resolvingNative) "OmniSave…" else "OmniSave",
-                selected = useNative,
-                enabled = true,
-                onClick = { provider = PlaybackProvider.OMNI_SAVE },
-            )
-            if (playingLocalFile) {
-                Text(
-                    "offline",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.labelSmall,
-                )
             }
         }
 
@@ -204,7 +232,14 @@ fun PlayerScreen(nav: NavController, vm: PlayerViewModel) {
                     onPreviousEpisode = { vm.previousEpisode() },
                     onNextEpisode = { vm.nextEpisode() },
                     onPosition = { vm.reportPosition(it) },
-                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    contentKey = "$mediaType-${vm.idForUi}-$currentSeason-$currentEpisode",
+                    fullscreen = isFullscreen,
+                    onToggleFullscreen = { fullscreen = !fullscreen },
+                    modifier = if (isFullscreen) {
+                        Modifier.fillMaxSize()
+                    } else {
+                        Modifier.fillMaxWidth().weight(1f)
+                    },
                 )
             } else {
                 MoovieWaitingBanner(
@@ -213,7 +248,11 @@ fun PlayerScreen(nav: NavController, vm: PlayerViewModel) {
                         isLocalFile -> "Loading downloaded file…"
                         else -> "No OmniSave source found — switch to Embed."
                     },
-                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    modifier = if (isFullscreen) {
+                        Modifier.fillMaxSize()
+                    } else {
+                        Modifier.fillMaxWidth().weight(1f)
+                    },
                 )
             }
         } else {
@@ -224,7 +263,7 @@ fun PlayerScreen(nav: NavController, vm: PlayerViewModel) {
             )
         }
 
-        if (mediaType == "tv") {
+        if (!isFullscreen && mediaType == "tv") {
             // Season quick-switch row
             LazyRow(
                 modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
@@ -270,6 +309,49 @@ fun PlayerScreen(nav: NavController, vm: PlayerViewModel) {
             confirmButton = {},
             dismissButton = { TextButton(onClick = { showEpisodes = false }) { Text("Close") } },
         )
+    }
+
+    // Quality + subtitle picker for the movie/episode currently playing.
+    // Previously the download icon queued the item straight away, so there was
+    // no way to choose a resolution or a subtitle track from the player.
+    if (showDownloadPicker) {
+        val dvm: DownloadViewModel = viewModel(
+            key = "dl-player-${vm.idForUi}-" +
+                (if (mediaType == "tv") "s${currentSeason}e$currentEpisode" else "movie"),
+            factory = object : androidx.lifecycle.ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T =
+                    DownloadViewModel(mediaType, vm.idForUi) as T
+            },
+        )
+        val ep = episodes.firstOrNull { it.episodeNumber == currentEpisode }
+        if (mediaType == "tv") {
+            EpisodeDownloadDialog(
+                showName = titleName.ifBlank { "Series" },
+                season = currentSeason,
+                episode = currentEpisode,
+                episodeName = ep?.name,
+                airYear = ep?.airDate?.take(4)?.toIntOrNull() ?: year,
+                posterPath = posterPath,
+                onQueueFallback = { vm.toggleDownload() },
+                onDismiss = {
+                    showDownloadPicker = false
+                    vm.refreshDownload()
+                },
+                vm = dvm,
+            )
+        } else {
+            DownloadDialog(
+                titleName = titleName,
+                year = year,
+                posterPath = posterPath,
+                onDismiss = {
+                    showDownloadPicker = false
+                    vm.refreshDownload()
+                },
+                vm = dvm,
+            )
+        }
     }
 }
 
@@ -396,9 +478,14 @@ fun OmniSavePlayer(
     onPreviousEpisode: () -> Unit,
     onNextEpisode: () -> Unit,
     onPosition: (Long) -> Unit,
+    /** Identifies the movie/episode; a change means "start from the beginning". */
+    contentKey: String,
+    fullscreen: Boolean,
+    onToggleFullscreen: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val view = LocalView.current
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val activity = context.findActivity()
 
@@ -431,18 +518,32 @@ fun OmniSavePlayer(
     var durationMs by remember { mutableLongStateOf(0L) }
     var speed by remember { mutableFloatStateOf(1f) }
     var showControls by remember { mutableStateOf(true) }
-    var fullscreen by remember { mutableStateOf(false) }
+    var lastContentKey by remember { mutableStateOf<String?>(null) }
 
     val subtitleUri = remember(selectedCaption) {
-        selectedCaption?.url?.takeIf { it.isNotBlank() }?.let { Uri.parse(it) }
+        selectedCaption?.url?.takeIf { it.isNotBlank() }?.let { raw ->
+            // Downloaded subtitles are plain file paths; Uri.parse() would treat
+            // them as a relative URI and silently fail to open them.
+            if (raw.startsWith("/")) Uri.fromFile(java.io.File(raw)) else Uri.parse(raw)
+        }
     }
 
-    // (Re)load whenever the stream URL or subtitle track changes.
+    // (Re)load whenever the stream URL or subtitle track changes. Switching a
+    // subtitle must not restart the video, so keep the position unless the
+    // movie/episode itself changed.
     androidx.compose.runtime.LaunchedEffect(url, subtitleUri) {
+        val keepPosition = lastContentKey == contentKey
+        val resumeAt = if (keepPosition) player.currentPosition.coerceAtLeast(0L) else 0L
+        val subtitleMime = subtitleUri?.let { mimeForSubtitle(it.toString()) }
         val subConfigs = subtitleUri?.let { u ->
             listOf(
                 androidx.media3.common.MediaItem.SubtitleConfiguration.Builder(u)
-                    .setMimeType(mimeForSubtitle(u.toString()))
+                    .setMimeType(subtitleMime ?: mimeForSubtitle(u.toString()))
+                    .setLanguage(selectedCaption?.lan)
+                    .setLabel(selectedCaption?.lanName)
+                    // Without DEFAULT the track is loaded but never selected,
+                    // which looked exactly like "subtitles don't work".
+                    .setSelectionFlags(androidx.media3.common.C.SELECTION_FLAG_DEFAULT)
                     .build()
             )
         } ?: emptyList()
@@ -450,9 +551,19 @@ fun OmniSavePlayer(
             .setUri(if (url.startsWith("/")) Uri.fromFile(java.io.File(url)) else Uri.parse(url))
             .setSubtitleConfigurations(subConfigs)
             .build()
-        player.setMediaItem(item)
+        android.util.Log.d(
+            TAG,
+            "Loading stream=${url.take(60)}… subtitle=${selectedCaption?.lan ?: "off"} mime=$subtitleMime",
+        )
+        // Explicitly enable/disable the text renderer; ExoPlayer otherwise keeps
+        // whatever selection state the previous media item had.
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_TEXT, subtitleUri == null)
+            .build()
+        player.setMediaItem(item, resumeAt)
         player.prepare()
         player.playWhenReady = true
+        lastContentKey = contentKey
     }
 
     androidx.compose.runtime.DisposableEffect(player) {
@@ -491,6 +602,28 @@ fun OmniSavePlayer(
             onDispose { activity.requestedOrientation = old }
         } else {
             onDispose { }
+        }
+    }
+
+    // Hide the status/navigation bars while fullscreen so the video really uses
+    // the whole display; restore them when leaving.
+    androidx.compose.runtime.DisposableEffect(fullscreen, view) {
+        val window = activity?.window
+        if (window != null) {
+            val controller = WindowCompat.getInsetsController(window, view)
+            if (fullscreen) {
+                controller.systemBarsBehavior =
+                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                controller.hide(WindowInsetsCompat.Type.systemBars())
+            } else {
+                controller.show(WindowInsetsCompat.Type.systemBars())
+            }
+        }
+        onDispose {
+            if (window != null) {
+                WindowCompat.getInsetsController(window, view)
+                    .show(WindowInsetsCompat.Type.systemBars())
+            }
         }
     }
 
@@ -551,7 +684,7 @@ fun OmniSavePlayer(
                 onCaption = onSelectCaption,
                 onPreviousEpisode = onPreviousEpisode,
                 onNextEpisode = onNextEpisode,
-                onFullscreen = { fullscreen = !fullscreen },
+                onFullscreen = onToggleFullscreen,
             )
         }
     }
@@ -776,6 +909,19 @@ private fun formatTime(ms: Long): String {
     return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
 }
 
-/** Best-guess subtitle MIME from the URL extension. */
-private fun mimeForSubtitle(url: String): String =
-    if (url.lowercase().contains(".vtt")) "text/vtt" else "application/x-subrip"
+private const val TAG = "OmniSavePlayer"
+
+/**
+ * Best-guess subtitle MIME from the URL/file extension. OmniSave serves .srt
+ * (application/x-subrip); WebVTT and ASS are supported by media3 as well.
+ */
+private fun mimeForSubtitle(url: String): String {
+    val path = runCatching { Uri.parse(url).lastPathSegment }.getOrNull()
+        ?.lowercase()
+        ?: url.substringBefore('?').lowercase()
+    return when {
+        path.endsWith(".vtt") -> "text/vtt"
+        path.endsWith(".ass") || path.endsWith(".ssa") -> "text/x-ssa"
+        else -> "application/x-subrip"
+    }
+}

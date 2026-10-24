@@ -225,7 +225,7 @@ fun SeriesScreen(nav: NavController, vm: SeriesViewModel) {
     val loading by vm.loading.collectAsState()
     val error by vm.error.collectAsState()
     val downloadedKeys by vm.downloadedKeys.collectAsState()
-    var downloadEpisode by remember { mutableStateOf<TmdbEpisode?>(null) }
+    var downloadEpisodeNumber by remember { mutableStateOf<Int?>(null) }
 
     Column(Modifier.fillMaxSize().background(Color.Black)) {
         // ---- Top bar ----
@@ -251,7 +251,12 @@ fun SeriesScreen(nav: NavController, vm: SeriesViewModel) {
                 )
             }
             val isDownloaded = downloadedKeys.contains(vm.downloadKey())
-            IconButton(onClick = { vm.toggleDownload() }) {
+            // Ask for quality + subtitle before downloading the current episode
+            // instead of queueing it invisibly; downloaded episodes are removed.
+            IconButton(onClick = {
+                if (isDownloaded) vm.removeEpisode(season, episode)
+                else downloadEpisodeNumber = episode
+            }) {
                 Icon(
                     if (isDownloaded) Icons.Filled.DownloadDone else Icons.Filled.DownloadForOffline,
                     contentDescription = if (isDownloaded) "Remove from downloads" else "Save for offline",
@@ -305,7 +310,7 @@ fun SeriesScreen(nav: NavController, vm: SeriesViewModel) {
                         ep = ep,
                         selected = ep.episodeNumber == episode,
                         downloaded = downloadedKeys.contains(vm.downloadKey(season, ep.episodeNumber)),
-                        onDownload = { downloadEpisode = ep },
+                        onDownload = { downloadEpisodeNumber = ep.episodeNumber },
                         onClick = { vm.play(ep.episodeNumber) },
                     )
                 }
@@ -315,9 +320,10 @@ fun SeriesScreen(nav: NavController, vm: SeriesViewModel) {
     }
 
     // ---- Episode quality-picker dialog (real MP4 download via OmniSave) ----
-    downloadEpisode?.let { ep ->
+    downloadEpisodeNumber?.let { epNum ->
+        val ep = episodes.firstOrNull { it.episodeNumber == epNum }
         val dvm: DownloadViewModel = viewModel(
-            key = "dl-tv-${vm.tmdbId}-s${season}e${ep.episodeNumber}",
+            key = "dl-tv-${vm.tmdbId}-s${season}e$epNum",
             factory = object : androidx.lifecycle.ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T =
@@ -327,13 +333,13 @@ fun SeriesScreen(nav: NavController, vm: SeriesViewModel) {
         EpisodeDownloadDialog(
             showName = showName.ifBlank { "Series" },
             season = season,
-            episode = ep.episodeNumber,
-            episodeName = ep.name,
-            airYear = ep.airDate?.take(4)?.toIntOrNull(),
+            episode = epNum,
+            episodeName = ep?.name,
+            airYear = ep?.airDate?.take(4)?.toIntOrNull(),
             posterPath = null,
-            onQueueFallback = { vm.queueEpisode(season, ep.episodeNumber) },
+            onQueueFallback = { vm.queueEpisode(season, epNum) },
             onDismiss = {
-                downloadEpisode = null
+                downloadEpisodeNumber = null
                 vm.refreshDownloadedKeys()
             },
             vm = dvm,

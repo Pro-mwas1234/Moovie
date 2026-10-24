@@ -5,9 +5,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.CircularProgressIndicator
@@ -129,7 +130,10 @@ class DownloadViewModel(
                 // Persist first so DownloadManager's update() finds the row.
                 ServiceLocator.downloads.addOrUpdate(uid, item)
                 ServiceLocator.downloadManager.enqueue(
-                    item, quality.url, subtitle?.url?.takeIf { it.isNotBlank() },
+                    item,
+                    quality.url,
+                    subtitle?.url?.takeIf { it.isNotBlank() },
+                    subtitle?.lan?.takeIf { it.isNotBlank() } ?: subtitle?.lanName,
                 )
                 started.value = true
                 onStarted()
@@ -274,15 +278,21 @@ fun DownloadDialog(
                                 style = MaterialTheme.typography.titleSmall,
                             )
                             Spacer(Modifier.height(4.dp))
-                            LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                                item {
-                                    SubtitleRow(
-                                        label = "None",
-                                        selected = selectedSubtitle == null,
-                                        onPick = { vm.selectedSubtitle.value = null },
-                                    )
-                                }
-                                items(subtitles) { sub ->
+                            // Cap and scroll this list by hand: a LazyColumn here
+                            // takes every remaining pixel of the dialog and pushes
+                            // the quality choices below out of sight.
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 180.dp)
+                                    .verticalScroll(rememberScrollState()),
+                            ) {
+                                SubtitleRow(
+                                    label = "None",
+                                    selected = selectedSubtitle == null,
+                                    onPick = { vm.selectedSubtitle.value = null },
+                                )
+                                subtitles.forEach { sub ->
                                     SubtitleRow(
                                         label = sub.lanName ?: sub.lan ?: "Unknown",
                                         selected = selectedSubtitle?.url == sub.url,
@@ -406,15 +416,18 @@ fun EpisodeDownloadDialog(
                                 style = MaterialTheme.typography.titleSmall,
                             )
                             Spacer(Modifier.height(4.dp))
-                            LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                                item {
-                                    SubtitleRow(
-                                        label = "None",
-                                        selected = selectedSubtitle == null,
-                                        onPick = { vm.selectedSubtitle.value = null },
-                                    )
-                                }
-                                items(subtitles) { sub ->
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 180.dp)
+                                    .verticalScroll(rememberScrollState()),
+                            ) {
+                                SubtitleRow(
+                                    label = "None",
+                                    selected = selectedSubtitle == null,
+                                    onPick = { vm.selectedSubtitle.value = null },
+                                )
+                                subtitles.forEach { sub ->
                                     SubtitleRow(
                                         label = sub.lanName ?: sub.lan ?: "Unknown",
                                         selected = selectedSubtitle?.url == sub.url,

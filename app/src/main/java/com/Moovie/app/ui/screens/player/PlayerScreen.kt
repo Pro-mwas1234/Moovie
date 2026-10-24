@@ -79,6 +79,7 @@ class PlayerViewModel(
 
     val titleName = MutableStateFlow("")
     val posterPath = MutableStateFlow<String?>(null)
+    val year = MutableStateFlow<Int?>(null)
     val seasons = MutableStateFlow(1)
     val currentSeason = MutableStateFlow(initialSeason.coerceAtLeast(1))
     val currentEpisode = MutableStateFlow(initialEpisode.coerceAtLeast(1))
@@ -118,12 +119,14 @@ class PlayerViewModel(
                     val detail = ServiceLocator.movies.tvDetail(tmdbId)
                     titleName.value = detail.title.name
                     posterPath.value = detail.title.posterPath
+                    year.value = detail.title.year
                     seasons.value = (detail.seasons ?: 1).coerceAtLeast(1)
                     loadEpisodes(currentSeason.value)
                 } else {
                     val detail = ServiceLocator.movies.movieDetail(tmdbId)
                     titleName.value = detail.title.name
                     posterPath.value = detail.title.posterPath
+                    year.value = detail.title.year
                 }
             } catch (_: Exception) {
             }
@@ -233,7 +236,8 @@ class PlayerViewModel(
         if (currentEpisode.value > 1) setEpisode(currentEpisode.value - 1)
     }
 
-    private fun refreshDownload() {
+    /** Re-reads whether the current title/episode has a Downloads entry. */
+    fun refreshDownload() {
         viewModelScope.launch {
             val uid = ServiceLocator.auth.ensureUid() ?: return@launch
             downloaded.value = ServiceLocator.downloads.findItem(uid, downloadKey()) != null

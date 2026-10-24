@@ -11,6 +11,7 @@ import okhttp3.Request
 import android.util.Log
 import java.io.File
 import java.io.FileOutputStream
+import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 /** Result of checking GitHub's latest release. */
@@ -21,6 +22,8 @@ data class UpdateInfo(
     val apkUrl: String,
     val apkSizeBytes: Long,
     val publishedAt: String?,
+    /** Lower-case hex SHA-256 of the APK, or null when GitHub doesn't publish one. */
+    val apkSha256: String? = null,
 ) {
     val hasUpdate: Boolean
         get() = apkUrl.isNotBlank()
@@ -40,6 +43,8 @@ private data class GhAsset(
     val name: String? = null,
     @SerializedName("browser_download_url") val browserDownloadUrl: String? = null,
     val size: Long = 0,
+    /** GitHub publishes "sha256:<hex>" for uploaded release assets. */
+    val digest: String? = null,
 )
 
 /** Outcome of an APK download: exactly one of [file] / [error] is set. */
@@ -97,6 +102,10 @@ class UpdateChecker {
                     apkUrl = apk.browserDownloadUrl ?: return@withContext null,
                     apkSizeBytes = apk.size ?: 0L,
                     publishedAt = rel.publishedAt,
+                    apkSha256 = apk.digest
+                        ?.removePrefix("sha256:")
+                        ?.lowercase()
+                        ?.takeIf { it.length == 64 },
                 )
             }
         }.onFailure { e ->
@@ -108,18 +117,35 @@ class UpdateChecker {
      * Streams the APK into cache and returns the file for the installer.
      *
      * Release APKs are big; a single dropped connection used to throw away the
-     * whole download and report "check your connection". Now it:
-     *  - writes to a .part file first, so the installer never sees a half APK,
-     *  - resumes with an HTTP Range request after each failure (up to 5 tries),
-     *  - verifies the byte count matches the server's before declaring success,
-     *  - returns the real error so the UI can say something specific.
+     * whole download and report "check your connection". Now it:     * - writes to a .part file first, so the installer never sees a half APK,
+     * - keys that .part by download URL, so a partial download of an older
+     *   release is never resumed with bytes from a newer one,
+     * - resumes with an HTTP Range request after each failure (up to 5 tries),
+     * - verifies the byte count *and* the release SHA-256 before success,
+     * - returns the real error so the UI can say something specific.
      */
-    suspend fun downloadApk(context: Context, url: String, onProgress: (Int) -> Unit): DownloadResult =
+    suspend fun downloadApk(
+        context: Context,
+        url: String,
+        expectedSha256: String? = null,
+        onProgress: (Int) -> Unit,
+    ): DownloadResult =
         withContext(Dispatchers.IO) {
             val dest = File(context.cacheDir, "moovie-update.apk")
-            val part = File(context.cacheDir, "moovie-update.apk.part")
+            // The partial file is keyed by download URL: GitHub URLs carry the
+            // release tag, so bytes from a half-finished older release can never
+            // be appended to a newer APK. Mixing them used to produce a file with
+            // the right size and a readable manifest but a broken APK signature,
+            // which Android reports as "There was a problem parsing the package".
+            val part = File(context.cacheDir, "moovie-update-${Integer.toHexString(url.hashCode())}.apk.part")
+            // Drop partials left behind by other releases or killed downloads,
+            // including the single "moovie-update.apk.part" older builds used.
+            context.cacheDir.listFiles { f ->
+                f.name.startsWith("moovie-update") && f.name.endsWith(".apk.part") && f.name != part.name
+            }?.forEach { it.delete() }
             if (dest.exists()) dest.delete() // stale file from an old attempt; always re-verify
             var lastError: String? = null
+            var checksumFailures = 0
 
             repeat(MAX_ATTEMPTS) { attempt ->
                 try {
@@ -131,6 +157,11 @@ class UpdateChecker {
                         .build()
                     http.newCall(req).execute().use { resp ->
                         val resumeOk = already > 0 && resp.code == 206
+                        if (resp.code == 416 && already > 0) {
+                            // Server says our partial is already at/beyond the end;
+                            // it can't be trusted, so restart from byte 0.
+                            part.delete()
+                        }
                         if (resp.code != 200 && !resumeOk) error("HTTP ${resp.code}")
                         val body = resp.body ?: error("Empty response body")
                         // Total expected size: Content-Range on resume, else Content-Length.
@@ -160,17 +191,43 @@ class UpdateChecker {
                                 }
                             }
                         }
-                        if (total > 0 && part.length() < total) {
+                        if (total > 0 && part.length() != total) {
                             error("Incomplete file (${part.length()}/$total bytes)")
                         }
                         if (part.length() <= 0L) error("Downloaded file is empty")
+
+                        // A byte-perfect length is not enough: a resumed .part from
+                        // another release (or an error page) can match the size and
+                        // still be uninstallable. Verify the release's SHA-256 when
+                        // GitHub provides one, otherwise make sure the package parses.
+                        val expected = expectedSha256?.lowercase()
+                        if (expected != null) {
+                            val actual = sha256(part)
+                            if (!actual.equals(expected, ignoreCase = true)) {
+                                part.delete() // never resume these bytes again
+                                checksumFailures++
+                                error("Integrity check failed (expected ${expected.take(12)}…, got ${actual.take(12)}…)")
+                            }
+                            Log.i(TAG, "APK SHA-256 verified (${actual.take(12)}…)")
+                        } else if (!isInstallableApk(context, part)) {
+                            part.delete()
+                            error("Downloaded file is not a valid APK")
+                        }
+
                         if (dest.exists()) dest.delete()
                         if (!part.renameTo(dest)) error("Couldn't save the downloaded file")
+                        onProgress(100)
                         return@withContext DownloadResult(file = dest)
                     }
                 } catch (e: Exception) {
                     lastError = e.message ?: e.javaClass.simpleName
                     Log.w(TAG, "APK download attempt ${attempt + 1}/$MAX_ATTEMPTS failed: $lastError")
+                    // A fresh download that keeps failing its checksum means the
+                    // source itself is bad; don't burn five more full downloads.
+                    if (checksumFailures >= 2) {
+                        part.delete()
+                        return@withContext DownloadResult(error = lastError)
+                    }
                 }
                 kotlinx.coroutines.delay(1500L * (attempt + 1)) // back off before retrying
             }
@@ -178,6 +235,26 @@ class UpdateChecker {
             part.delete()
             DownloadResult(error = lastError ?: "Unknown error")
         }
+
+    /** Streams the file through SHA-256; returns lower-case hex. */
+    private fun sha256(file: File): String {
+        val md = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buf = ByteArray(256 * 1024)
+            while (true) {
+                val n = input.read(buf)
+                if (n < 0) break
+                md.update(buf, 0, n)
+            }
+        }
+        return md.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    /** Last-resort check for releases without a published digest. */
+    private fun isInstallableApk(context: Context, file: File): Boolean {
+        val info = context.packageManager.getPackageArchiveInfo(file.absolutePath, 0) ?: return false
+        return info.packageName == context.packageName
+    }
 
     companion object {
         private const val TAG = "UpdateChecker"

@@ -70,7 +70,9 @@ class UpdateViewModel : ViewModel() {
             state.value = UpdateState.DOWNLOADING
             progress.value = 0
             message.value = null
-            val result = checker.downloadApk(context, target.apkUrl) { pct -> progress.value = pct }
+            val result = checker.downloadApk(context, target.apkUrl, target.apkSha256) { pct ->
+                progress.value = pct
+            }
             val file = result.file
             if (file != null && file.exists() && file.length() > 0L) {
                 apkFile = file
